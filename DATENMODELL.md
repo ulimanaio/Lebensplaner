@@ -74,5 +74,6 @@ history_entry_removed, history_cleared, import, challenge_toggled, challenge_not
 | Verlauf-Drawer | `renderOverlay`, `openLog` |
 | Boot/Init | `init`, `renderBoot` |
 
+`frontend/js/markdown.js`: Markdown-Basics für alle Freitext-Felder — `mdToHtml` (Renderer), `mdField` (Drop-in-Ersatz für Textareas: gerenderte Ansicht, Tipp = bearbeiten, ⛶ öffnet Fullscreen-Editor), `openMdEditor`. Gespeichert wird immer roher Markdown-Text — Dokument-Struktur unverändert.
 `frontend/js/api.js`: Fetch-Wrapper — `getDoc`, `saveDoc` (1 s Debounce), `flushAll`, `sendEvent`.
 `server/server.js`: komplette API (~115 Zeilen) — Routen siehe ARCHITEKTUR.md.

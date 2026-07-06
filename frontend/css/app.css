@@ -60,8 +60,8 @@ body {
 }
 .year-btn {
   background: none; border: none; color: var(--mut);
-  width: 24px; height: 24px; border-radius: 50%;
-  cursor: pointer; font-size: 14px; line-height: 1; padding: 0;
+  width: 40px; height: 40px; border-radius: 50%;
+  cursor: pointer; font-size: 16px; line-height: 1; padding: 0;
 }
 .year-btn:hover { background: var(--hover); color: var(--title); }
 .year-label {
@@ -193,6 +193,20 @@ main { max-width: 1180px; margin: 0 auto; padding: clamp(16px, 4vw, 32px) clamp(
   padding: 40px; text-align: center; color: var(--mut); font-size: 14px;
 }
 
+/* ===== Klappbare Info-Box ===== */
+.info-collapse { margin-bottom: 16px; }
+.info-collapse-summary {
+  color: var(--accent); cursor: pointer; font-size: 14px; font-weight: 500;
+  min-height: 44px; display: flex; align-items: center; list-style: none;
+}
+.info-collapse-summary::-webkit-details-marker { display: none; }
+.info-collapse-summary::after { content: ' ▾'; margin-left: 6px; transition: transform 0.15s; }
+.info-collapse[open] > .info-collapse-summary::after { transform: rotate(180deg); }
+.info-collapse-body { padding-top: 4px; }
+.info-collapse-body > .frei-intro,
+.info-collapse-body > .habits-why,
+.info-collapse-body > .frei-sos-text { margin-bottom: 0; }
+
 /* ===== Freiheit & Kontrolle ===== */
 .frei-screen { max-width: 820px; }
 .frei-intro { font-size: 14px; color: var(--mut); line-height: 1.6; margin-bottom: 16px; }
@@ -219,6 +233,9 @@ main { max-width: 1180px; margin: 0 auto; padding: clamp(16px, 4vw, 32px) clamp(
   display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 12px; margin-bottom: 20px;
 }
+@media (max-width: 720px) {
+  .frei-stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
 .frei-stat-card { background: var(--card); border-radius: 16px; padding: 14px; text-align: center; }
 .frei-stat-val { font-family: var(--font-display); font-size: 26px; font-weight: 700; }
 .frei-stat-label { font-size: 12px; color: var(--mut); }
@@ -227,6 +244,8 @@ main { max-width: 1180px; margin: 0 auto; padding: clamp(16px, 4vw, 32px) clamp(
 .frei-cal-card { margin-bottom: 20px; }
 .frei-cal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .frei-cal-title { font-family: var(--font-display); font-size: 15px; font-weight: 500; color: var(--title); }
+.frei-cal-toggle { display: inline-flex; align-items: center; gap: 8px; background: none; border: none; padding: 4px 0; cursor: pointer; text-align: left; }
+.frei-cal-caret { color: var(--mut); font-size: 12px; }
 .frei-cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px; }
 .frei-cal-weekday { text-align: center; font-size: 11px; color: var(--mut); font-weight: 500; }
 .frei-cal-weeks { display: flex; flex-direction: column; gap: 6px; }
@@ -363,7 +382,7 @@ main { max-width: 1180px; margin: 0 auto; padding: clamp(16px, 4vw, 32px) clamp(
 .cal-nav { display: flex; align-items: center; gap: 14px; }
 .cal-nav-btn {
   background: var(--inset); border: 1px solid var(--border); color: var(--body);
-  border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 14px;
+  border-radius: 50%; width: 40px; height: 40px; cursor: pointer; font-size: 14px;
 }
 .cal-nav-label {
   font-family: var(--font-display); font-size: 14px; font-weight: 500; color: var(--title);
@@ -379,7 +398,7 @@ main { max-width: 1180px; margin: 0 auto; padding: clamp(16px, 4vw, 32px) clamp(
 .habit-count-total { font-size: 13px; color: var(--mut); font-weight: 400; }
 .habit-delete-btn {
   background: none; border: none; color: var(--mut); font-size: 12px; cursor: pointer;
-  padding: 2px 0; display: block; margin-left: auto;
+  padding: 12px 0; display: block; margin-left: auto;
 }
 .habit-delete-btn:hover { color: var(--danger); }
 .habit-progress { height: 6px; background: var(--inset); border-radius: 100px; margin: 12px 0 16px; overflow: hidden; }
@@ -545,3 +564,137 @@ main { max-width: 1180px; margin: 0 auto; padding: clamp(16px, 4vw, 32px) clamp(
 .btn-ghost:hover { background: var(--hover); }
 .ch-done-at { font-size: 12px; color: var(--mut); }
 @media (max-width: 600px) { .ch-body { padding-left: 20px; } }
+
+/* ===== Mobile Bottom-Nav ===== */
+/* Auf Desktop komplett versteckt; nur ≤720 px als fixe Leiste eingeblendet. */
+.bottom-nav { display: none; }
+
+@media (max-width: 720px) {
+  /* Header-Tabs weichen der Bottom-Nav. */
+  .tabs { display: none; }
+
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 50;
+    background: var(--card);
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .bottom-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: 48px;
+    padding: 6px 2px;
+    background: none;
+    border: none;
+    color: var(--mut);
+    font-family: var(--font-body);
+    cursor: pointer;
+  }
+  .bottom-nav-btn.active { color: #C2E7FF; }
+  .bottom-nav-icon { font-size: 20px; line-height: 1; }
+  .bottom-nav-label { font-size: 11px; line-height: 1; }
+}
+
+/* ===== Mobile-Header: eine Zeile, max ~60px hoch ===== */
+@media (max-width: 720px) {
+  .header { padding: 10px 14px; }
+  .app-subtitle { display: none; }
+  .logo { width: 32px; height: 32px; font-size: 14px; }
+  .app-title { font-size: 14px; }
+  /* Titel-Block (links) und Verlauf-Button (rechts) in einer Zeile;
+     Tabs umbrechen in die nächste Zeile. */
+  .header-right { flex-wrap: wrap; justify-content: flex-end; }
+  .header-right .tabs { flex-basis: 100%; order: 2; }
+  .save-btn { order: 1; }
+
+  /* Auf Mobile die coachCard („Deine Baustelle") vor das Radar ziehen. */
+  .coach-card { order: -1; }
+  .radar-card-slot { order: 0; }
+  .radar-card svg { max-width: 300px; }
+
+  /* Touch-Targets: 66-Tage-Zellen auf min. 40px vergrößern. */
+  .habit-streak-grid { grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); }
+
+  /* Slider-Zeile im Fokus-Tab nie breiter als der Bildschirm. */
+  .fokus-endscore-row { min-width: 0; width: 100%; }
+}
+
+/* ===== Markdown-Felder (markdown.js) ===== */
+.md-field { position: relative; }
+.md-field .input-area, .md-field .sheet-textarea { padding-right: 38px; }
+.md-expand {
+  position: absolute; top: 4px; right: 4px;
+  width: 34px; height: 34px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: none; border-radius: 100px;
+  color: var(--dim); cursor: pointer; opacity: 0.7;
+}
+.md-expand:hover, .md-expand:active { color: var(--accent); background: var(--hover); opacity: 1; }
+
+/* Gerenderte Ansicht — gleicher Look wie das Eingabefeld, tippen = bearbeiten */
+.md-view { cursor: text; overflow-wrap: break-word; }
+.md-render { font-size: 13px; line-height: 1.55; color: var(--body); }
+.md-render strong { color: var(--title); font-weight: 600; }
+.md-render ul, .md-render ol { margin: 2px 0; padding-left: 20px; }
+.md-render li { margin: 2px 0; }
+.md-render .md-h { font-family: var(--font-display); font-weight: 500; color: var(--title); margin: 6px 0 2px; }
+.md-render .md-h1 { font-size: 16px; }
+.md-render .md-h2 { font-size: 15px; }
+.md-render .md-h3 { font-size: 14px; }
+.md-render .md-gap { height: 8px; }
+
+/* Fullscreen-Editor */
+.mdfs {
+  position: fixed; inset: 0; z-index: 300;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  padding: 12px;
+  padding-top: max(12px, env(safe-area-inset-top));
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+.mdfs-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.mdfs-title {
+  flex: 1; min-width: 0;
+  font-family: var(--font-display); font-size: 15px; font-weight: 500; color: var(--title);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mdfs-icon {
+  width: 44px; height: 44px; flex-shrink: 0;
+  border: none; border-radius: 100px;
+  background: var(--card); color: var(--sec);
+  font-size: 17px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.mdfs-icon:hover { background: var(--hover); }
+.mdfs-icon.active { color: var(--accent); background: var(--inset); }
+.mdfs-save { background: var(--accent); color: #131314; font-weight: 700; }
+.mdfs-save:hover { background: var(--accent-hover); }
+.mdfs-ta {
+  flex: 1; width: 100%; resize: none;
+  background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+  color: var(--body); font-family: var(--font-body); font-size: 15px; line-height: 1.6;
+  padding: 16px;
+}
+.mdfs-prev {
+  flex: 1; overflow-y: auto;
+  background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+  padding: 16px; font-size: 15px;
+}
+.mdfs-bar { display: flex; gap: 6px; margin-top: 10px; }
+.mdfs-btn {
+  flex: 1; min-height: 44px;
+  border: 1px solid var(--border); border-radius: 100px;
+  background: var(--card); color: var(--body);
+  font-family: var(--font-body); font-size: 15px; cursor: pointer;
+}
+.mdfs-btn:hover { background: var(--hover); }
+.mdfs-b { font-weight: 700; }
+.mdfs-i { font-style: italic; }
+.mdfs-s { text-decoration: line-through; }

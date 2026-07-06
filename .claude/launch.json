@@ -4,8 +4,9 @@
     {
       "name": "lebensplaner-dev",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["C:/Users/Xerex/AppData/Local/Temp/claude/C--Users-Xerex-Documents-GitHub-Lebensplaner/b940e178-b152-46bd-ab6c-b42289038f78/scratchpad/devserver.mjs"],
-      "port": 8484
+      "runtimeArgs": ["C:/Users/Xerex/AppData/Local/Temp/claude/C--Users-Xerex-Documents-GitHub-Lebensplaner/c8947394-cb5f-496d-8166-f605a100e9b9/scratchpad/devserver.mjs"],
+      "port": 8484,
+      "autoPort": true
     }
   ]
 }

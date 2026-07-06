@@ -2,6 +2,7 @@
 // Nachbau von design_reference/Lebensplaner.dc.html, Daten via /api statt localStorage.
 import { getDoc, saveDoc, flushAll, sendEvent, setSaveListener } from './api.js';
 import { CHALLENGES } from './challenges-data.js';
+import { mdField } from './markdown.js';
 
 const AREAS = [
   { id: 'koerper', name: 'Körper & Geist', color: '#8AB4F8', placeholder: 'Ich fühle mich unbesiegbar. Nichts kann mir etwas anhaben, ich durchstehe jede Krise und jedes körperliche Gebrechen (Terminator-Modus).', goalPlaceholder: 'z. B. Zweimal die Woche Laufen, zweimal die Woche Fitnessstudio, einen Halbmarathon laufen, einen HYROX-Wettkampf absolvieren.' },
@@ -21,6 +22,15 @@ const TABS = [
   { id: 'frei', label: 'Freiheit' },
   { id: 'challenges', label: 'Challenges' },
 ];
+
+// Icon + Kurz-Label je Tab für die mobile Bottom-Nav (Reihenfolge wie TABS).
+const BOTTOM_NAV = {
+  dashboard: { icon: '📊', label: 'Dashboard' },
+  fokus: { icon: '🎯', label: 'Fokus' },
+  habits: { icon: '✅', label: 'Habits' },
+  frei: { icon: '🕊️', label: 'Freiheit' },
+  challenges: { icon: '🏆', label: 'Challenges' },
+};
 
 const JAHR_DEFAULT = 2026;
 
@@ -42,6 +52,7 @@ const state = {
 const yearCache = new Map(); // jahr -> doc (vermeidet Races mit debounced Saves)
 const refs = {};             // DOM-Referenzen für gezielte Updates (Slider-Live-Feedback)
 let flashTimer = null;
+let habitFormOpen = false;
 
 // ---------- DOM-Helfer ----------
 function el(tag, attrs = {}, ...children) {
@@ -59,6 +70,14 @@ function el(tag, attrs = {}, ...children) {
     node.append(c.nodeType ? c : document.createTextNode(c));
   }
   return node;
+}
+
+// Klappbare Info-Box: auf Mobile zugeklappt, auf Desktop (>720px) initial offen.
+function collapsibleInfo(title, ...content) {
+  return el('details', { class: 'info-collapse', open: window.innerWidth > 720 ? '' : null },
+    el('summary', { class: 'info-collapse-summary' }, title),
+    el('div', { class: 'info-collapse-body' }, ...content),
+  );
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -343,6 +362,22 @@ function renderHeader() {
   return header;
 }
 
+// ---------- Mobile Bottom-Nav (nur ≤720 px sichtbar, per CSS gesteuert) ----------
+function renderBottomNav() {
+  return el('nav', { class: 'bottom-nav' },
+    TABS.map((t) => {
+      const meta = BOTTOM_NAV[t.id];
+      return el('button', {
+        class: 'bottom-nav-btn' + (state.tab === t.id ? ' active' : ''),
+        onClick: () => selectTab(t.id),
+      },
+        el('span', { class: 'bottom-nav-icon' }, meta.icon),
+        el('span', { class: 'bottom-nav-label' }, meta.label),
+      );
+    }),
+  );
+}
+
 // ---------- Radar-Chart (SVG, Geometrie 1:1 aus dem Prototyp) ----------
 function buildRadar() {
   const scores = state.doc.scores;
@@ -416,7 +451,7 @@ function renderDashboard() {
   refs.radar = buildRadar();
   refs.avg = el('span', { class: 'avg-num' }, avgScoreText());
 
-  const radarCard = el('div', { class: 'card p28 radar-card' },
+  const radarCard = el('div', { class: 'card p28 radar-card radar-card-slot' },
     el('div', { class: 'card-title' }, 'Wie rund läuft dein Leben?'),
     el('div', { class: 'card-sub' }, 'Dein Ist-Zustand auf einer Skala von 1–10'),
     refs.radar,
@@ -471,10 +506,11 @@ function renderDashboard() {
       ),
       el('div', {},
         el('div', { class: 'vision-label', style: 'color:' + a.color + ';' }, 'MEINE 10 VON 10'),
-        el('textarea', {
-          class: 'input-area', rows: 4, placeholder: a.placeholder, value: s.visions[a.id] || '',
-          onChange: (ev) => {
-            s.visions[a.id] = ev.target.value;
+        mdField({
+          rows: 4, placeholder: a.placeholder, value: s.visions[a.id] || '',
+          title: 'Vision: ' + a.name,
+          onCommit: (v) => {
+            s.visions[a.id] = v;
             setDoc({ visions: s.visions }, '„10 von 10“-Vision bearbeitet');
             sendEvent('vision_edited', { year: state.year, area: a.id });
           },
@@ -532,10 +568,11 @@ function renderFokus() {
         el('div', { class: 'fokus-goal-title' }, 'Ziele: ' + a.name),
       ),
       el('div', { class: 'fokus-goal-sub' }, 'Konkret, messbar, verbindlich. Keine Wünsche — Verpflichtungen.'),
-      el('textarea', {
-        class: 'input-area', rows: 5, placeholder: a.goalPlaceholder, value: s.goals[a.id] || '',
-        onChange: (ev) => {
-          s.goals[a.id] = ev.target.value;
+      mdField({
+        rows: 5, placeholder: a.goalPlaceholder, value: s.goals[a.id] || '',
+        title: 'Ziele: ' + a.name,
+        onCommit: (v) => {
+          s.goals[a.id] = v;
           setDoc({ goals: s.goals }, 'Jahresziel bearbeitet');
           sendEvent('goal_edited', { year: state.year, area: a.id });
         },
@@ -563,12 +600,13 @@ function renderFokus() {
           ),
         ),
         el('div', { class: 'fokus-reflexion-hint' }, 'Sei ehrlicher zu dir, als dir lieb ist. Kein „Gescheitert" — nur „noch nicht erreicht".'),
-        el('textarea', {
-          class: 'input-area', rows: 4, placeholder: 'Was hast du dir vorgenommen? Was ist tatsächlich passiert? Keine Ausreden.',
+        mdField({
+          rows: 4, placeholder: 'Was hast du dir vorgenommen? Was ist tatsächlich passiert? Keine Ausreden.',
           value: (s.reflexions || {})[a.id] || '',
-          onChange: (ev) => {
+          title: 'Reflexion: ' + a.name,
+          onCommit: (v) => {
             s.reflexions = s.reflexions || {};
-            s.reflexions[a.id] = ev.target.value;
+            s.reflexions[a.id] = v;
             setDoc({ reflexions: s.reflexions }, 'Reflexion bearbeitet');
             sendEvent('reflexion_edited', { year: state.year, area: a.id });
           },
@@ -626,6 +664,10 @@ function renderFreiTagebuch() {
   const selDate = g.freiSelDate || today;
   const dayMs = 86400000;
 
+  // Kalender ein-/ausklappbar: Default offen auf Desktop, zugeklappt auf schmalen Screens
+  if (g.freiCalOpen === undefined) g.freiCalOpen = window.innerWidth > 720;
+  const calOpen = g.freiCalOpen;
+
   // Statistiken
   const dates = Object.keys(log).sort();
   const total = dates.length;
@@ -674,7 +716,14 @@ function renderFreiTagebuch() {
         + (isFuture ? ' future' : '') + (isSel ? ' selected' : '') + (isToday ? ' today' : ''),
       title: date.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })
         + (status === 'clean' ? ' · clean' : status === 'fall' ? ' · Rückfall' : ''),
-      onClick: () => { if (!isFuture) { g.freiSelDate = iso; render(); } },
+      onClick: () => {
+        if (!isFuture) {
+          g.freiSelDate = iso;
+          render();
+          // Nach dem Re-Render sanft zur Tageskarte scrollen, damit die Auswahl sofort sichtbar ist
+          setTimeout(() => document.getElementById('frei-day-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+        }
+      },
     },
       String(date.getDate()),
       urgesByDate[iso] && el('span', { class: 'frei-cal-urge-dot' }),
@@ -685,8 +734,11 @@ function renderFreiTagebuch() {
 
   const calCard = el('div', { class: 'card p24 frei-cal-card' },
     el('div', { class: 'frei-cal-head' },
-      el('div', { class: 'frei-cal-title' }, 'Verlauf — Tag antippen zum Zurückblättern'),
-      el('div', { class: 'cal-nav' },
+      el('button', {
+        class: 'frei-cal-title frei-cal-toggle' + (calOpen ? ' open' : ''),
+        onClick: () => { g.freiCalOpen = !calOpen; render(); },
+      }, el('span', { class: 'frei-cal-caret' }, calOpen ? '▾' : '▸'), 'Verlauf — Tag antippen zum Zurückblättern'),
+      calOpen && el('div', { class: 'cal-nav' },
         el('button', {
           class: 'cal-nav-btn', onClick: () => {
             const m = calM - 1;
@@ -704,9 +756,9 @@ function renderFreiTagebuch() {
         }, '›'),
       ),
     ),
-    el('div', { class: 'frei-cal-weekdays' }, WEEKDAYS.map((wd) => el('div', { class: 'frei-cal-weekday' }, wd))),
-    el('div', { class: 'frei-cal-weeks' }, weeks),
-    el('div', { class: 'frei-cal-legend' },
+    calOpen && el('div', { class: 'frei-cal-weekdays' }, WEEKDAYS.map((wd) => el('div', { class: 'frei-cal-weekday' }, wd))),
+    calOpen && el('div', { class: 'frei-cal-weeks' }, weeks),
+    calOpen && el('div', { class: 'frei-cal-legend' },
       el('span', {}, el('span', { class: 'frei-legend-dot', style: 'background:#81C995;' }), 'Clean'),
       el('span', {}, el('span', { class: 'frei-legend-dot', style: 'background:#FDD663;' }), 'Rückfall'),
       el('span', {}, el('span', { class: 'frei-legend-dot round', style: 'background:#C58AF9;' }), 'Urge gemeldet'),
@@ -718,7 +770,7 @@ function renderFreiTagebuch() {
   const selVal = log[selDate];
   const selUrges = urgesByDate[selDate] || [];
 
-  const dayCard = el('div', { class: 'card p24 frei-day-card' },
+  const dayCard = el('div', { class: 'card p24 frei-day-card', id: 'frei-day-card' },
     el('div', { class: 'frei-day-head' },
       el('div', { class: 'frei-day-label' },
         selD.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + (selDate === today ? ' · Heute' : '')),
@@ -756,22 +808,24 @@ function renderFreiTagebuch() {
       ' — mit Situation, Uhrzeit, Gerät und Gefühl davor. So findest du die Lücke im System.'),
     el('div', { class: 'frei-field' },
       el('div', { class: 'frei-field-label', style: 'color:#81C995;' }, 'DANKBARKEIT — 3 DINGE, TÄGLICH'),
-      el('textarea', {
-        class: 'input-area', rows: 3, placeholder: '1. …\n2. …\n3. …',
+      mdField({
+        rows: 3, placeholder: '1. …\n2. …\n3. …',
         value: (F.dank || {})[selDate] || '',
-        onChange: (ev) => {
-          setFrei({ dank: { ...(F.dank || {}), [selDate]: ev.target.value } }, 'Dankbarkeit bearbeitet');
+        title: 'Dankbarkeit · ' + selDate,
+        onCommit: (v) => {
+          setFrei({ dank: { ...(F.dank || {}), [selDate]: v } }, 'Dankbarkeit bearbeitet');
           sendEvent('frei_dank_edited', { date: selDate });
         },
       }),
     ),
     el('div', {},
       el('div', { class: 'frei-field-label', style: 'color:#8AB4F8;' }, 'TAGEBUCH — WIE WAR DER TAG?'),
-      el('textarea', {
-        class: 'input-area', rows: 5, placeholder: 'Was ist passiert? Wie ging es dir? Was hast du gelernt?',
+      mdField({
+        rows: 5, placeholder: 'Was ist passiert? Wie ging es dir? Was hast du gelernt?',
         value: (F.diary || {})[selDate] || '',
-        onChange: (ev) => {
-          setFrei({ diary: { ...(F.diary || {}), [selDate]: ev.target.value } }, 'Tagebuch bearbeitet');
+        title: 'Tagebuch · ' + selDate,
+        onCommit: (v) => {
+          setFrei({ diary: { ...(F.diary || {}), [selDate]: v } }, 'Tagebuch bearbeitet');
           sendEvent('frei_diary_edited', { date: selDate });
         },
       }),
@@ -782,6 +836,7 @@ function renderFreiTagebuch() {
   );
 
   return el('div', {},
+    dayCard,
     el('div', { class: 'frei-stats-grid' },
       statCard(quote, 'Erfolgsquote', '#81C995'),
       statCard(String(run), 'Aktuelle Serie', '#8AB4F8'),
@@ -789,7 +844,6 @@ function renderFreiTagebuch() {
       statCard(String(total), 'Tage getrackt', '#E3E3E3'),
     ),
     calCard,
-    dayCard,
   );
 }
 
@@ -807,9 +861,10 @@ function renderFreiUrge() {
 
   const soforthilfe = el('div', { class: 'card p24 frei-sos-card' },
     el('div', { class: 'frei-sos-title' }, '🚨 Bei akutem Drang — zuerst das'),
-    el('div', { class: 'frei-sos-text' },
-      el('b', { style: 'color:#E3E3E3;' }, '3-Sekunden-Regel:'),
-      ' Riskanter Gedanke oder Bild? Innerhalb von 3 Sekunden bewusst wegdrehen — danach hat der Autopilot übernommen. Dann Energie umleiten:'),
+    collapsibleInfo('ℹ️ So funktioniert die 3-Sekunden-Regel',
+      el('div', { class: 'frei-sos-text' },
+        el('b', { style: 'color:#E3E3E3;' }, '3-Sekunden-Regel:'),
+        ' Riskanter Gedanke oder Bild? Innerhalb von 3 Sekunden bewusst wegdrehen — danach hat der Autopilot übernommen. Dann Energie umleiten:')),
     el('div', { class: 'frei-sos-chips' },
       el('span', { class: 'frei-sos-chip' }, '🏋️ Sport / Liegestütze'),
       el('span', { class: 'frei-sos-chip' }, '🌲 Raus in die Natur'),
@@ -872,16 +927,18 @@ function renderFreiUrge() {
     el('div', { class: 'frei-grid-2' },
       el('div', {},
         el('div', { class: 'frei-field-label' }, 'SITUATION'),
-        el('textarea', {
-          class: 'input-area', rows: 2, placeholder: 'z. B. allein zuhause, gelangweilt', value: d.situation,
-          onChange: (ev) => setD({ situation: ev.target.value }),
+        mdField({
+          rows: 2, placeholder: 'z. B. allein zuhause, gelangweilt', value: d.situation,
+          title: 'Situation',
+          onCommit: (v) => setD({ situation: v }),
         }),
       ),
       el('div', {},
         el('div', { class: 'frei-field-label' }, 'GERÄT'),
-        el('textarea', {
-          class: 'input-area', rows: 2, placeholder: 'z. B. Handy im Bett', value: d.geraet,
-          onChange: (ev) => setD({ geraet: ev.target.value }),
+        mdField({
+          rows: 2, placeholder: 'z. B. Handy im Bett', value: d.geraet,
+          title: 'Gerät',
+          onCommit: (v) => setD({ geraet: v }),
         }),
       ),
     ),
@@ -901,25 +958,28 @@ function renderFreiUrge() {
       el('div', { class: 'frei-grid-2' },
         el('div', {},
           el('div', { class: 'frei-field-label' }, 'GEFÜHL / KURZ DAVOR'),
-          el('textarea', {
-            class: 'input-area', rows: 2, placeholder: 'z. B. gestresst, einsam, Streit gehabt', value: d.gefuehl,
-            onChange: (ev) => setD({ gefuehl: ev.target.value }),
+          mdField({
+            rows: 2, placeholder: 'z. B. gestresst, einsam, Streit gehabt', value: d.gefuehl,
+            title: 'Gefühl kurz davor',
+            onCommit: (v) => setD({ gefuehl: v }),
           }),
         ),
         el('div', {},
           el('div', { class: 'frei-field-label' }, 'WAS HÄTTE GEHOLFEN?'),
-          el('textarea', {
-            class: 'input-area', rows: 2, placeholder: 'z. B. Handy nicht mit ins Bett, früher schlafen', value: d.hilfe,
-            onChange: (ev) => setD({ hilfe: ev.target.value }),
+          mdField({
+            rows: 2, placeholder: 'z. B. Handy nicht mit ins Bett, früher schlafen', value: d.hilfe,
+            title: 'Was hätte geholfen?',
+            onCommit: (v) => setD({ hilfe: v }),
           }),
         ),
       ),
     ),
     d.outcome === 'res' && el('div', {},
       el('div', { class: 'frei-field-label', style: 'color:#81C995;' }, 'WAS HAT GEHOLFEN?'),
-      el('textarea', {
-        class: 'input-area', rows: 2, placeholder: 'z. B. kalte Dusche, rausgegangen, Buddy angerufen, 3-Sekunden-Regel', value: d.hilfe,
-        onChange: (ev) => setD({ hilfe: ev.target.value }),
+      mdField({
+        rows: 2, placeholder: 'z. B. kalte Dusche, rausgegangen, Buddy angerufen, 3-Sekunden-Regel', value: d.hilfe,
+        title: 'Was hat geholfen?',
+        onCommit: (v) => setD({ hilfe: v }),
       }),
     ),
     el('div', { class: 'frei-urge-actions' },
@@ -1038,10 +1098,11 @@ function renderFreiGenerell() {
   function field(label, color, placeholder, key, rows) {
     return el('div', {},
       el('div', { class: 'frei-field-label', style: 'color:' + color + ';' }, label),
-      el('textarea', {
-        class: 'input-area', rows, placeholder, value: F[key] || '',
-        onChange: (ev) => {
-          setFrei({ [key]: ev.target.value }, 'Freiheit & Kontrolle bearbeitet');
+      mdField({
+        rows, placeholder, value: F[key] || '',
+        title: label,
+        onCommit: (v) => {
+          setFrei({ [key]: v }, 'Freiheit & Kontrolle bearbeitet');
           sendEvent('frei_field_edited', { field: key });
         },
       }),
@@ -1088,7 +1149,8 @@ function renderFrei() {
 
   return el('div', { class: 'screen frei-screen', 'data-screen-label': 'Freiheit und Kontrolle' },
     el('h2', { class: 'section-h2', style: 'margin-top:0;' }, 'Freiheit & Kontrolle'),
-    el('div', { class: 'frei-intro' }, 'Systeme statt Willenskraft. Die Quote zählt — nicht der Streak. Ein Rückfall ist ein Datenpunkt, kein Urteil. Alle Daten bleiben nur auf deinem Gerät.'),
+    collapsibleInfo('ℹ️ Warum das Ganze?',
+      el('div', { class: 'frei-intro' }, 'Systeme statt Willenskraft. Die Quote zählt — nicht der Streak. Ein Rückfall ist ein Datenpunkt, kein Urteil. Alle Daten bleiben nur auf deinem Gerät.')),
     tabsRow,
     tab === 'tagebuch' ? renderFreiTagebuch()
       : tab === 'urge' ? renderFreiUrge()
@@ -1140,12 +1202,13 @@ function renderChallenges() {
 
     const body = open && el('div', { class: 'ch-body' },
       c.text.map((p) => el('p', { class: 'ch-text' }, p)),
-      el('textarea', {
-        class: 'input-area', rows: 3,
+      mdField({
+        rows: 3,
         placeholder: 'Meine Notizen, Prognose & Erfahrungsbericht …',
         value: st.note || '',
-        onChange: (ev) => {
-          setChallenge(c.id, { note: ev.target.value });
+        title: 'Notiz: ' + c.title,
+        onCommit: (v) => {
+          setChallenge(c.id, { note: v });
           sendEvent('challenge_note_edited', { challengeId: c.id });
         },
       }),
@@ -1225,7 +1288,10 @@ function renderHabits() {
     render();
   }
 
-  const addCard = el('div', { class: 'habit-add-card' },
+  const noHabits = g.habits.length === 0;
+  const formOpen = noHabits || habitFormOpen;
+
+  const addForm = el('div', { class: 'habit-add-card' },
     el('div', { class: 'habit-add-title' }, 'Neue Gewohnheit anlegen'),
     el('input', {
       class: 'habit-input', value: g.newHabitName, placeholder: 'Gewohnheit, z. B. Fitnessstudio',
@@ -1266,6 +1332,12 @@ function renderHabits() {
       ' Du hast bereits 3 aktive Gewohnheiten in den ersten 66 Tagen. Konzentriere dich auf die Basics. Setze maximal 1–2 Gewohnheiten um, bevor du neue hinzufügst.'),
     el('button', { class: 'btn-primary', onClick: addHabit }, '+ Hinzufügen'),
   );
+
+  const addCard = formOpen ? addForm : el('button', {
+    class: 'btn-ghost',
+    style: 'width:100%;',
+    onClick: () => { habitFormOpen = true; render(); },
+  }, '+ Neue Gewohnheit');
 
   const toolbar = el('div', { class: 'habits-toolbar' },
     el('div', { class: 'habits-view-toggle' },
@@ -1386,20 +1458,37 @@ function renderHabits() {
     );
   });
 
-  return el('div', { class: 'screen habits-screen', 'data-screen-label': 'Habit Tracker' },
-    el('h2', { class: 'section-h2', style: 'margin-top:0;' }, 'Der verbindliche Wochenplan'),
-    el('div', { class: 'habits-intro' },
-      'Motivation ist ein kurzfristiger Impuls — danach zählen Disziplin und Gewohnheit. Formuliere ',
-      el('b', { style: 'color:#E3E3E3;' }, 'Wenn-Dann-Pläne'), ' (Implementation Intentions) und tracke ',
-      el('b', { style: 'color:#E3E3E3;' }, '66 Tage'), '.'),
+  const introText = el('div', { class: 'habits-intro' },
+    'Motivation ist ein kurzfristiger Impuls — danach zählen Disziplin und Gewohnheit. Formuliere ',
+    el('b', { style: 'color:#E3E3E3;' }, 'Wenn-Dann-Pläne'), ' (Implementation Intentions) und tracke ',
+    el('b', { style: 'color:#E3E3E3;' }, '66 Tage'), '.');
+  const whyBox = collapsibleInfo('🧪 Warum 66 Tage (nicht 21)?',
     el('div', { class: 'habits-why' },
-      '🧪 ', el('b', { style: 'color:#81C995;' }, 'Warum 66 Tage (nicht 21)?'),
-      ' Studien (Lally et al., 2009) zeigen: Es dauert im Schnitt 66 Tage, bis ein Verhalten automatisiert ist. Und: ',
+      'Studien (Lally et al., 2009) zeigen: Es dauert im Schnitt 66 Tage, bis ein Verhalten automatisiert ist. Und: ',
       el('b', { style: 'color:#81C995;' }, 'Einzelne Aussetzer zerstören den Gewohnheitsaufbau nicht'),
-      ' — dein Fortschritt wird hier nie auf null gesetzt.'),
-    addCard,
+      ' — dein Fortschritt wird hier nie auf null gesetzt.'));
+
+  const heading = el('h2', { class: 'section-h2', style: 'margin-top:0;' }, 'Der verbindliche Wochenplan');
+
+  if (noHabits) {
+    // Leerer Zustand: Intro-Texte oben, Formular aufgeklappt (wie bisher).
+    return el('div', { class: 'screen habits-screen', 'data-screen-label': 'Habit Tracker' },
+      heading,
+      introText,
+      whyBox,
+      addCard,
+      toolbar,
+      habitCards,
+    );
+  }
+
+  return el('div', { class: 'screen habits-screen', 'data-screen-label': 'Habit Tracker' },
+    heading,
     toolbar,
     habitCards,
+    addCard,
+    introText,
+    whyBox,
   );
 }
 
@@ -1422,9 +1511,10 @@ function renderCommentSheet() {
         el('div', { class: 'sheet-sub' },
           date.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) + ' · Tag ' + (t.idx + 1)),
       ),
-      el('textarea', {
-        class: 'sheet-textarea', rows: 3, placeholder: 'Notiz zu diesem Tag …', value: t.draft,
-        onInput: (ev) => { t.draft = ev.target.value; },
+      mdField({
+        className: 'sheet-textarea', rows: 3, placeholder: 'Notiz zu diesem Tag …', value: t.draft,
+        title: 'Notiz: ' + h.name,
+        onCommit: (v) => { t.draft = v; },
       }),
       el('div', { class: 'sheet-actions' },
         hasExisting && el('button', { class: 'sheet-btn sheet-btn-danger', onClick: () => saveComment('') }, 'Löschen'),
@@ -1520,7 +1610,7 @@ function render() {
       : state.tab === 'challenges' ? renderChallenges()
       : renderFrei(),
   );
-  root.replaceChildren(renderHeader(), main);
+  root.replaceChildren(renderHeader(), main, renderBottomNav());
   if (state.logOpen) renderOverlay();
   const sheet = renderCommentSheet();
   if (sheet) root.append(sheet);
