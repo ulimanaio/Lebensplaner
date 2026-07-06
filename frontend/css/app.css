@@ -506,3 +506,42 @@ main { max-width: 1180px; margin: 0 auto; padding: clamp(16px, 4vw, 32px) clamp(
 .boot-inner .logo { width: 56px; height: 56px; border-radius: 16px; font-size: 24px; margin: 0 auto 16px; }
 .boot-title { font-family: var(--font-display); font-size: 20px; font-weight: 500; color: var(--title); margin: 0 0 8px; }
 .boot-text { font-size: 14px; color: var(--mut); line-height: 1.6; }
+
+/* ---------- Mini-Challenges ---------- */
+.ch-progress { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.ch-progress-bar { flex: 1; height: 8px; background: var(--inset); border-radius: 100px; overflow: hidden; }
+.ch-progress-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width .3s; }
+.ch-progress-label { font-size: 13px; color: var(--mut); white-space: nowrap; }
+.ch-list { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.ch-card { overflow: hidden; }
+.ch-card.ch-current { outline: 1px solid var(--accent); }
+.ch-head {
+  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+  background: none; border: none; cursor: pointer; padding: 16px 20px; min-height: 44px;
+}
+.ch-head:hover { background: var(--hover); }
+.ch-nr {
+  flex: none; width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--inset); color: var(--sec); font-family: var(--font-display); font-size: 14px;
+}
+.ch-nr.done { background: var(--accent); color: #131314; }
+.ch-head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ch-title { font-family: var(--font-display); font-size: 15px; font-weight: 500; color: var(--title); }
+.ch-week-badge {
+  margin-left: 8px; padding: 2px 10px; border-radius: 100px;
+  background: var(--accent); color: #131314; font-size: 11px; font-weight: 500; vertical-align: 2px;
+}
+.ch-sub { font-size: 13px; color: var(--mut); }
+.ch-chevron { flex: none; color: var(--dim); font-size: 20px; transform: rotate(0deg); transition: transform .15s; }
+.ch-chevron.open { transform: rotate(90deg); }
+.ch-body { padding: 0 20px 20px 70px; }
+.ch-text { font-size: 14px; color: var(--body); line-height: 1.6; margin: 0 0 10px; }
+.ch-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.btn-ghost {
+  background: none; border: 1px solid var(--border); color: var(--sec);
+  border-radius: 100px; padding: 10px 20px; font-size: 14px; cursor: pointer; min-height: 44px;
+}
+.btn-ghost:hover { background: var(--hover); }
+.ch-done-at { font-size: 12px; color: var(--mut); }
+@media (max-width: 600px) { .ch-body { padding-left: 20px; } }

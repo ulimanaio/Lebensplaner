@@ -15,6 +15,13 @@ Single-User-Lebensplanungs-App. Läuft lokal auf Unraid in EINEM Docker-Containe
 - Mobile-first: Touch-Ziele ≥ 44px, Tabs horizontal scrollbar, Bottom-Sheets für Eingaben am Handy.
 - Fonts: 'Google Sans' / 'Google Sans Text' / 'Roboto'.
 
+## Effizient arbeiten (Credits sparen)
+- **Zuerst `DATENMODELL.md` lesen** — dort stehen alle Dokument-Strukturen, Event-Typen und ein Funktions-Wegweiser für `app.js`. app.js (~1470 Zeilen) NICHT komplett lesen; per Grep zur Funktion aus dem Wegweiser springen.
+- Dateikarte: `server/server.js` (API, ~115 Z.) · `frontend/js/api.js` (Fetch/Debounce, ~60 Z.) · `frontend/js/app.js` (gesamte UI) · `frontend/css/app.css` (Styles) · `db/migrations/` (Schema).
+- `design_reference/Lebensplaner.dc.html` nur öffnen, wenn neue UI pixelgenau nachgebaut wird.
+- Nach Änderungen an app.js/api.js/css: kein Build nötig — nur Seite neu laden.
+- Bei neuen Feldern in Dokumenten: `DATENMODELL.md` mitpflegen (Ein-Zeilen-Ergänzung), damit künftige Sessions nicht suchen müssen.
+
 ## Konventionen
 - Deutsch in UI-Copy und Commit-Messages; Code/Bezeichner Englisch oder wie im Bestand.
 - Keine neuen npm-Dependencies ohne Notwendigkeit; Frontend bleibt dependency-frei.

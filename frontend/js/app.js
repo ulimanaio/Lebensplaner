@@ -1,6 +1,7 @@
 // Lebensplaner-Frontend — Vanilla DOM, kein Build-Schritt.
 // Nachbau von design_reference/Lebensplaner.dc.html, Daten via /api statt localStorage.
 import { getDoc, saveDoc, flushAll, sendEvent, setSaveListener } from './api.js';
+import { CHALLENGES } from './challenges-data.js';
 
 const AREAS = [
   { id: 'koerper', name: 'Körper & Geist', color: '#8AB4F8', placeholder: 'Ich fühle mich unbesiegbar. Nichts kann mir etwas anhaben, ich durchstehe jede Krise und jedes körperliche Gebrechen (Terminator-Modus).', goalPlaceholder: 'z. B. Zweimal die Woche Laufen, zweimal die Woche Fitnessstudio, einen Halbmarathon laufen, einen HYROX-Wettkampf absolvieren.' },
@@ -18,6 +19,7 @@ const TABS = [
   { id: 'fokus', label: 'Fokus & Ziele' },
   { id: 'habits', label: 'Habit Tracker' },
   { id: 'frei', label: 'Freiheit' },
+  { id: 'challenges', label: 'Challenges' },
 ];
 
 const JAHR_DEFAULT = 2026;
@@ -122,6 +124,9 @@ function freshGlobalDoc() {
     freiSelDate: null,
     freiCalYear: null,
     freiCalMonth: null,
+    challenges: {},          // <id>: { done, doneAt, note } — Mini-Challenges (Wehrle)
+    challengeOpen: null,     // aufgeklappte Challenge-Karte
+    challengeFilter: 'alle', // 'alle' | 'offen' | 'erledigt'
   };
 }
 
@@ -307,7 +312,7 @@ function selectTab(id) {
 
 // ---------- Header ----------
 function renderHeader() {
-  const showYearPicker = state.tab !== 'habits' && state.tab !== 'frei';
+  const showYearPicker = state.tab !== 'habits' && state.tab !== 'frei' && state.tab !== 'challenges';
   refs.saveBtn = el('button', { class: 'save-btn', title: 'Änderungsverlauf anzeigen', onClick: openLog });
   const header = el('header', { class: 'header' },
     el('div', { class: 'header-left' },
@@ -1091,6 +1096,95 @@ function renderFrei() {
   );
 }
 
+// ---------- Mini-Challenges (Martin Wehrle, 52 Wochen-Impulse) ----------
+function isoWeek(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t - yearStart) / 86400000 + 1) / 7);
+}
+
+function setChallenge(id, patch) {
+  const g = state.global;
+  const cur = (g.challenges && g.challenges[id]) || { done: false, doneAt: null, note: '' };
+  setGlobal({ challenges: { ...(g.challenges || {}), [id]: { ...cur, ...patch } } }, 'Mini-Challenge aktualisiert');
+}
+
+function renderChallenges() {
+  const g = state.global;
+  const all = g.challenges || {};
+  const doneCount = CHALLENGES.filter((c) => all[c.id] && all[c.id].done).length;
+  const weekNr = ((isoWeek(new Date()) - 1) % 52) + 1;
+  const filter = g.challengeFilter || 'alle';
+
+  const filtered = CHALLENGES.filter((c) => {
+    const done = all[c.id] && all[c.id].done;
+    return filter === 'alle' || (filter === 'erledigt' ? done : !done);
+  });
+
+  function card(c) {
+    const st = all[c.id] || { done: false, doneAt: null, note: '' };
+    const open = g.challengeOpen === c.id;
+    const isWeek = c.id === weekNr;
+
+    const head = el('button', {
+      class: 'ch-head', onClick: () => { setGlobal({ challengeOpen: open ? null : c.id }); render(); },
+    },
+      el('span', { class: 'ch-nr' + (st.done ? ' done' : '') }, st.done ? '✓' : String(c.id)),
+      el('span', { class: 'ch-head-text' },
+        el('span', { class: 'ch-title' }, c.title, isWeek && el('span', { class: 'ch-week-badge' }, 'Diese Woche')),
+        el('span', { class: 'ch-sub' }, c.subtitle),
+      ),
+      el('span', { class: 'ch-chevron' + (open ? ' open' : '') }, '›'),
+    );
+
+    const body = open && el('div', { class: 'ch-body' },
+      c.text.map((p) => el('p', { class: 'ch-text' }, p)),
+      el('textarea', {
+        class: 'input-area', rows: 3,
+        placeholder: 'Meine Notizen, Prognose & Erfahrungsbericht …',
+        value: st.note || '',
+        onChange: (ev) => {
+          setChallenge(c.id, { note: ev.target.value });
+          sendEvent('challenge_note_edited', { challengeId: c.id });
+        },
+      }),
+      el('div', { class: 'ch-actions' },
+        el('button', {
+          class: st.done ? 'btn-ghost' : 'btn-primary',
+          onClick: () => {
+            const done = !st.done;
+            setChallenge(c.id, { done, doneAt: done ? new Date().toISOString().slice(0, 10) : null });
+            sendEvent('challenge_toggled', { challengeId: c.id, done });
+            render();
+          },
+        }, st.done ? 'Als offen markieren' : '✓ Erledigt'),
+        st.done && st.doneAt && el('span', { class: 'ch-done-at' }, 'Erledigt am ' + new Date(st.doneAt).toLocaleDateString('de-DE')),
+      ),
+    );
+
+    return el('div', { class: 'card ch-card' + (isWeek ? ' ch-current' : '') }, head, body);
+  }
+
+  const filterRow = el('div', { class: 'frei-subtabs' },
+    [['alle', 'Alle'], ['offen', 'Offen'], ['erledigt', 'Erledigt']].map(([id, label]) => el('button', {
+      class: 'frei-subtab-btn' + (filter === id ? ' active' : ''),
+      onClick: () => { setGlobal({ challengeFilter: id }); render(); },
+    }, label + (id === 'erledigt' ? ' (' + doneCount + ')' : ''))),
+  );
+
+  return el('div', { class: 'screen', 'data-screen-label': 'Mini-Challenges' },
+    el('h2', { class: 'section-h2', style: 'margin-top:0;' }, 'Mini-Challenges'),
+    el('div', { class: 'frei-intro' }, '52 Wochen-Impulse aus »Dieses Buch verändert dein Leben für immer« (Martin Wehrle). Eine Challenge pro Woche reicht — klein anfangen, groß wirken.'),
+    el('div', { class: 'ch-progress' },
+      el('div', { class: 'ch-progress-bar' }, el('div', { class: 'ch-progress-fill', style: 'width:' + Math.round((doneCount / CHALLENGES.length) * 100) + '%;' })),
+      el('span', { class: 'ch-progress-label' }, doneCount + ' / ' + CHALLENGES.length + ' erledigt'),
+    ),
+    filterRow,
+    el('div', { class: 'ch-list' }, filtered.map(card)),
+  );
+}
+
 // ---------- Habit Tracker ----------
 function renderHabits() {
   const g = state.global;
@@ -1423,6 +1517,7 @@ function render() {
     state.tab === 'dashboard' ? renderDashboard()
       : state.tab === 'fokus' ? renderFokus()
       : state.tab === 'habits' ? renderHabits()
+      : state.tab === 'challenges' ? renderChallenges()
       : renderFrei(),
   );
   root.replaceChildren(renderHeader(), main);
