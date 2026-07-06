@@ -1,0 +1,15 @@
+services:
+  lebensplaner:
+    build: .
+    container_name: lebensplaner
+    ports:
+      - "8484:8484"
+    volumes:
+      - /mnt/user/appdata/lebensplaner:/data
+    environment:
+      # PFLICHT: langes eigenes Passwort setzen. Ohne diese Passphrase
+      # ist die Datenbank-Datei nicht lesbar — sicher aufbewahren!
+      - DB_PASSPHRASE=${DB_PASSPHRASE:?DB_PASSPHRASE muss gesetzt sein}
+      # Optional: 4-6-stellige PIN als simpler Zugriffsschutz im LAN
+      # - APP_PIN=1234
+    restart: unless-stopped

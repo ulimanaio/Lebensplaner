@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#131314">
+<title>Lebensplaner</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<style>
+  html,body{margin:0;padding:0;background:#131314;color:#E3E3E3;font-family:system-ui,sans-serif;}
+</style>
+</head>
+<body>
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;">
+  <div style="text-align:center;max-width:420px;padding:24px;">
+    <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#8AB4F8,#C58AF9);display:flex;align-items:center;justify-content:center;font-weight:700;color:#131314;font-size:24px;margin:0 auto 16px;">L</div>
+    <h1 style="font-size:20px;font-weight:500;color:#FFF;margin:0 0 8px;">Setup läuft ✓</h1>
+    <p style="font-size:14px;color:#9AA0A6;line-height:1.6;">Server und verschlüsselte Datenbank funktionieren.
+    Die eigentliche App wird mit Claude Code nach der Design-Referenz
+    (<code>design_reference/Lebensplaner.dc.html</code>) hier aufgebaut.</p>
+    <p id="api-status" style="font-size:13px;color:#81C995;"></p>
+  </div>
+</div>
+<script>
+  // API-Selbsttest
+  fetch('/api/events?limit=1').then((r) => {
+    document.getElementById('api-status').textContent =
+      r.ok ? 'API erreichbar · Datenbank ok' : 'API-Fehler: ' + r.status;
+  }).catch(() => {
+    document.getElementById('api-status').textContent = 'API nicht erreichbar';
+  });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+</script>
+</body>
+</html>

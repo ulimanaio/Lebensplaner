@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Text:wght@400;500;700&family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#131314;}
+  *{box-sizing:border-box;}
+  input[type=range]{accent-color:#8AB4F8;}
+  textarea:focus,input:focus{outline:2px solid #8AB4F8;outline-offset:-1px;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+</style>
+</helmet>
+<div style="min-height:100vh;background:#131314;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;padding-bottom:80px;">
+
+  <!-- Header -->
+  <header style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px clamp(14px,3vw,32px);border-bottom:1px solid #2D2E30;position:sticky;top:0;background:rgba(19,19,20,0.92);backdrop-filter:blur(12px);z-index:10;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#8AB4F8,#C58AF9);display:flex;align-items:center;justify-content:center;font-family:'Google Sans',sans-serif;font-weight:700;color:#131314;font-size:18px;">L</div>
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-family:'Google Sans',sans-serif;font-size:18px;font-weight:500;color:#FFFFFF;">Lebensplaner</div>
+          <sc-if value="{{ showYearPicker }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;align-items:center;gap:2px;background:#28292C;border-radius:100px;padding:2px 4px;">
+              <button onClick="{{ yearPrev }}" title="Vorheriges Jahr" style="background:none;border:none;color:#9AA0A6;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1;" style-hover="background:#37383B;color:#FFFFFF;">‹</button>
+              <span style="font-family:'Google Sans',sans-serif;font-size:14px;font-weight:700;color:#8AB4F8;min-width:42px;text-align:center;">{{ jahr }}</span>
+              <button onClick="{{ yearNext }}" title="Nächstes Jahr" style="background:none;border:none;color:#9AA0A6;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1;" style-hover="background:#37383B;color:#FFFFFF;">›</button>
+            </div>
+          </sc-if>
+        </div>
+        <div style="font-size:12px;color:#9AA0A6;">Das 6-Säulen-System · Machbar, messbar, verbindlich</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+    <button onClick="{{ openLog }}" title="Änderungsverlauf anzeigen" style="{{ saveStyle }}" style-hover="filter:brightness(1.2);">{{ saveLabel }}</button>
+    <nav style="display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:2px;">
+      <sc-for list="{{ tabsView }}" as="t" hint-placeholder-count="4">
+        <button onClick="{{ t.select }}" style="{{ t.style }}" style-hover="background:#37383B;">{{ t.label }}</button>
+      </sc-for>
+    </nav>
+    </div>
+  </header>
+
+  <main style="max-width:1180px;margin:0 auto;padding:clamp(16px,4vw,32px) clamp(12px,3vw,24px);">
+
+    <!-- ============ DASHBOARD ============ -->
+    <sc-if value="{{ showDashboard }}" hint-placeholder-val="{{ true }}">
+      <div style="animation:fadeIn .3s ease;" data-screen-label="Dashboard">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:20px;align-items:stretch;">
+          <!-- Radar card -->
+          <div style="background:#1E1F20;border-radius:24px;padding:28px;display:flex;flex-direction:column;align-items:center;gap:8px;">
+            <div style="align-self:flex-start;font-family:'Google Sans',sans-serif;font-size:16px;font-weight:500;color:#FFFFFF;">Wie rund läuft dein Leben?</div>
+            <div style="align-self:flex-start;font-size:13px;color:#9AA0A6;">Dein Ist-Zustand auf einer Skala von 1–10</div>
+            {{ radarChart }}
+            <div style="display:flex;align-items:baseline;gap:8px;">
+              <span style="font-family:'Google Sans',sans-serif;font-size:40px;font-weight:700;color:#8AB4F8;">{{ avgScore }}</span>
+              <span style="font-size:14px;color:#9AA0A6;">Ø Gesamtzufriedenheit</span>
+            </div>
+          </div>
+          <!-- Coaching card -->
+          <div style="background:#1E1F20;border-radius:24px;padding:28px;display:flex;flex-direction:column;gap:16px;">
+            <div style="font-family:'Google Sans',sans-serif;font-size:16px;font-weight:500;color:#FFFFFF;">Deine Baustelle</div>
+            <div style="font-size:14px;line-height:1.6;color:#BDC1C6;">Das Netzdiagramm zeigt dir gnadenlos, wo du hinterherhinkst. Ein Bereich auf 5 oder 6 zieht dein ganzes Leben nach unten — dort liegt dein größter Hebel.</div>
+            <div style="background:#28292C;border-radius:16px;padding:20px;display:flex;align-items:center;gap:16px;">
+              <div style="width:48px;height:48px;border-radius:50%;background:{{ weakestColor }};display:flex;align-items:center;justify-content:center;font-family:'Google Sans',sans-serif;font-weight:700;font-size:18px;color:#131314;flex-shrink:0;">{{ weakestScore }}</div>
+              <div>
+                <div style="font-family:'Google Sans',sans-serif;font-weight:500;color:#FFFFFF;">{{ weakestName }}</div>
+                <div style="font-size:13px;color:#9AA0A6;">Dein aktuell schwächster Bereich — Kandidat für deinen Jahresfokus.</div>
+              </div>
+            </div>
+            <button onClick="{{ goToFokus }}" style="align-self:flex-start;margin-top:auto;background:#8AB4F8;color:#131314;border:none;border-radius:100px;padding:12px 24px;font-family:'Google Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;" style-hover="background:#AECBFA;">Jahresfokus festlegen →</button>
+          </div>
+        </div>
+
+        <!-- 6 areas -->
+        <h2 style="font-family:'Google Sans',sans-serif;font-size:20px;font-weight:500;color:#FFFFFF;margin:40px 0 6px;">Die 6 Lebensbereiche</h2>
+        <div style="font-size:14px;color:#9AA0A6;margin-bottom:20px;">Bewerte deinen Ist-Zustand und beschreibe ausführlich deine „10 von 10" — den absoluten Idealzustand.</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px;">
+          <sc-for list="{{ areasView }}" as="a" hint-placeholder-count="6">
+            <div style="background:#1E1F20;border-radius:24px;padding:24px;display:flex;flex-direction:column;gap:14px;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <div style="width:36px;height:36px;border-radius:50%;background:{{ a.color }};display:flex;align-items:center;justify-content:center;font-family:'Google Sans',sans-serif;font-weight:700;color:#131314;">{{ a.score }}</div>
+                <div style="font-family:'Google Sans',sans-serif;font-size:16px;font-weight:500;color:#FFFFFF;flex:1;">{{ a.name }}</div>
+                <sc-if value="{{ a.isFocus }}" hint-placeholder-val="{{ false }}">
+                  <span style="background:#28292C;border:1px solid {{ a.color }};color:{{ a.color }};font-size:11px;font-weight:500;border-radius:100px;padding:4px 10px;">FOKUS</span>
+                </sc-if>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-size:12px;color:#9AA0A6;">1</span>
+                <input type="range" min="1" max="10" step="1" value="{{ a.score }}" onChange="{{ a.setScore }}" style="flex:1;cursor:pointer;">
+                <span style="font-size:12px;color:#9AA0A6;">10</span>
+              </div>
+              <div>
+                <div style="font-size:12px;font-weight:500;color:{{ a.color }};letter-spacing:0.5px;margin-bottom:6px;">MEINE 10 VON 10</div>
+                <textarea value="{{ a.vision }}" onChange="{{ a.setVision }}" placeholder="{{ a.placeholder }}" rows="4" style="width:100%;background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:13px;line-height:1.5;padding:12px;resize:vertical;"></textarea>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ============ FOKUS & ZIELE ============ -->
+    <sc-if value="{{ showFokus }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:fadeIn .3s ease;max-width:820px;" data-screen-label="Fokus und Jahresziele">
+        <h2 style="font-family:'Google Sans',sans-serif;font-size:22px;font-weight:500;color:#FFFFFF;margin:0 0 6px;">Jahresfokus {{ jahr }}</h2>
+        <div style="font-size:14px;color:#9AA0A6;line-height:1.6;margin-bottom:24px;">Wer sechs Baustellen gleichzeitig angeht, schafft keine. Wähle <b style="color:#8AB4F8;">maximal {{ maxFokus }} Schwerpunkt-Bereiche</b> für dieses Jahr — der Rest läuft im Erhaltungsmodus weiter.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+          <sc-for list="{{ focusChips }}" as="c" hint-placeholder-count="6">
+            <button onClick="{{ c.toggle }}" style="{{ c.style }}" style-hover="filter:brightness(1.15);">{{ c.label }}</button>
+          </sc-for>
+        </div>
+        <div style="font-size:13px;color:{{ focusHintColor }};margin-bottom:28px;">{{ focusHint }}</div>
+
+        <sc-for list="{{ focusAreasView }}" as="f" hint-placeholder-count="1">
+          <div style="background:#1E1F20;border-radius:24px;padding:28px;margin-bottom:20px;">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;min-height:24px;">
+              <div style="width:12px;height:12px;border-radius:50%;background:{{ f.color }};flex-shrink:0;"></div>
+              <div style="font-family:'Google Sans',sans-serif;font-size:17px;font-weight:500;color:#FFFFFF;line-height:1.3;">Ziele: {{ f.name }}</div>
+            </div>
+            <div style="font-size:13px;color:#9AA0A6;margin-bottom:14px;">Konkret, messbar, verbindlich. Keine Wünsche — Verpflichtungen.</div>
+            <textarea value="{{ f.goals }}" onChange="{{ f.setGoals }}" placeholder="{{ f.goalPlaceholder }}" rows="5" style="width:100%;background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:14px;line-height:1.6;padding:14px;resize:vertical;"></textarea>
+            <div style="border-top:1px solid #3C4043;margin-top:20px;padding-top:18px;">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
+                <div style="font-family:'Google Sans',sans-serif;font-size:15px;font-weight:500;color:#FFFFFF;flex:1;">Reflexion: Was lief wirklich?</div>
+                <div style="display:flex;align-items:center;gap:10px;min-width:240px;">
+                  <span style="font-size:12px;color:#9AA0A6;">1</span>
+                  <input type="range" min="1" max="10" step="1" value="{{ f.endScore }}" onChange="{{ f.setEndScore }}" style="flex:1;cursor:pointer;">
+                  <span style="font-size:12px;color:#9AA0A6;">10</span>
+                  <div style="font-family:'Google Sans',sans-serif;font-size:15px;font-weight:500;color:{{ f.color }};white-space:nowrap;">{{ f.endScore }} <span style="font-size:12px;color:#9AA0A6;font-weight:400;">({{ f.startScore }})</span></div>
+                </div>
+              </div>
+              <div style="font-size:13px;color:#9AA0A6;line-height:1.6;margin-bottom:12px;">Sei ehrlicher zu dir, als dir lieb ist. Kein „Gescheitert" — nur <b style="color:#FDD663;">„noch nicht erreicht"</b>.</div>
+              <textarea value="{{ f.reflexion }}" onChange="{{ f.setReflexion }}" placeholder="Was hast du dir vorgenommen? Was ist tatsächlich passiert? Keine Ausreden." rows="4" style="width:100%;background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:14px;line-height:1.6;padding:14px;resize:vertical;"></textarea>
+            </div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noFocus }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#1E1F20;border:1px dashed #3C4043;border-radius:24px;padding:40px;text-align:center;color:#9AA0A6;font-size:14px;">Noch kein Fokus gewählt. Wähle oben 1–{{ maxFokus }} Bereiche, um Ziele zu definieren.</div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ============ HABIT TRACKER ============ -->
+    <sc-if value="{{ showHabits }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:fadeIn .3s ease;max-width:900px;" data-screen-label="Habit Tracker">
+        <h2 style="font-family:'Google Sans',sans-serif;font-size:22px;font-weight:500;color:#FFFFFF;margin:0 0 6px;">Der verbindliche Wochenplan</h2>
+        <div style="font-size:14px;color:#9AA0A6;line-height:1.6;margin-bottom:8px;">Motivation ist ein kurzfristiger Impuls — danach zählen Disziplin und Gewohnheit. Formuliere <b style="color:#E3E3E3;">Wenn-Dann-Pläne</b> (Implementation Intentions) und tracke <b style="color:#E3E3E3;">66 Tage</b>.</div>
+        <div style="background:#28292C;border-radius:16px;padding:16px 20px;font-size:13px;color:#BDC1C6;line-height:1.6;margin-bottom:28px;">🧪 <b style="color:#81C995;">Warum 66 Tage (nicht 21)?</b> Studien (Lally et al., 2009) zeigen: Es dauert im Schnitt 66 Tage, bis ein Verhalten automatisiert ist. Und: <b style="color:#81C995;">Einzelne Aussetzer zerstören den Gewohnheitsaufbau nicht</b> — dein Fortschritt wird hier nie auf null gesetzt.</div>
+
+        <!-- Add habit -->
+        <div style="background:#1E1F20;border-radius:24px;padding:24px;margin-bottom:24px;display:flex;flex-direction:column;gap:12px;">
+          <div style="font-family:'Google Sans',sans-serif;font-size:15px;font-weight:500;color:#FFFFFF;">Neue Gewohnheit anlegen</div>
+          <input value="{{ newHabitName }}" onChange="{{ setNewHabitName }}" placeholder="Gewohnheit, z. B. Fitnessstudio" style="background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-size:14px;padding:12px 14px;font-family:inherit;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px;">
+            <input value="{{ newHabitWenn }}" onChange="{{ setNewHabitWenn }}" placeholder="WENN … (z. B. Montag 19:00 Uhr ist)" style="background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-size:14px;padding:12px 14px;font-family:inherit;">
+            <input value="{{ newHabitDann }}" onChange="{{ setNewHabitDann }}" placeholder="DANN … (z. B. bin ich im Fitnessstudio)" style="background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-size:14px;padding:12px 14px;font-family:inherit;">
+          </div>
+          <div style="font-size:12px;color:#9AA0A6;margin-top:4px;">Dein „Warum": Entscheide dich bewusst zwischen dem <b style="color:#F28B82;">Schmerz der Disziplin</b> und dem <b style="color:#F28B82;">Schmerz der Reue</b>.</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px;">
+            <input value="{{ newHabitKurz }}" onChange="{{ setNewHabitKurz }}" placeholder="Kurzfristig (z. B. Anstrengend, keine Lust)" style="background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-size:13px;padding:12px 14px;font-family:inherit;">
+            <input value="{{ newHabitMittel }}" onChange="{{ setNewHabitMittel }}" placeholder="Mittelfristig (z. B. Besseres Körpergefühl)" style="background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-size:13px;padding:12px 14px;font-family:inherit;">
+            <input value="{{ newHabitLang }}" onChange="{{ setNewHabitLang }}" placeholder="Langfristig (z. B. Energiegeladenes Leben)" style="background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-size:13px;padding:12px 14px;font-family:inherit;">
+          </div>
+          <sc-if value="{{ overloadWarn }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#3C2A1E;border:1px solid #FDD663;border-radius:12px;padding:14px 18px;font-size:13px;color:#FDD663;line-height:1.6;">⚠️ <b>Überladungs-Gefahr!</b> Du hast bereits 3 aktive Gewohnheiten in den ersten 66 Tagen. Konzentriere dich auf die Basics. Setze maximal 1–2 Gewohnheiten um, bevor du neue hinzufügst.</div>
+          </sc-if>
+          <button onClick="{{ addHabit }}" style="align-self:flex-start;background:#8AB4F8;color:#131314;border:none;border-radius:100px;padding:10px 22px;font-family:'Google Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;" style-hover="background:#AECBFA;">+ Hinzufügen</button>
+        </div>
+
+        <!-- Habit list -->
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px;">
+          <div style="display:flex;gap:8px;">
+            <button onClick="{{ setStreakView }}" style="{{ streakBtnStyle }}">Streak-Ansicht</button>
+            <button onClick="{{ setMonthView }}" style="{{ monthBtnStyle }}">Monatsansicht</button>
+          </div>
+          <sc-if value="{{ isMonthView }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;gap:14px;">
+              <button onClick="{{ calPrev }}" style="background:#28292C;border:1px solid #3C4043;color:#E3E3E3;border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:14px;">‹</button>
+              <div style="font-family:'Google Sans',sans-serif;font-size:14px;font-weight:500;color:#FFFFFF;min-width:140px;text-align:center;text-transform:capitalize;">{{ calLabel }}</div>
+              <button onClick="{{ calNext }}" style="background:#28292C;border:1px solid #3C4043;color:#E3E3E3;border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:14px;">›</button>
+            </div>
+          </sc-if>
+        </div>
+        <sc-for list="{{ habitsView }}" as="h" hint-placeholder-count="2">
+          <div style="background:#1E1F20;border-radius:24px;padding:24px;margin-bottom:20px;">
+            <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:4px;">
+              <div style="flex:1;">
+                <div style="font-family:'Google Sans',sans-serif;font-size:16px;font-weight:500;color:#FFFFFF;">{{ h.name }}</div>
+                <div style="font-size:13px;color:#9AA0A6;margin-top:4px;"><b style="color:#FDD663;">Wenn</b> {{ h.wenn }}, <b style="color:#81C995;">dann</b> {{ h.dann }}.</div>
+                <sc-if value="{{ h.hasWhy }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+                    <span style="background:#28292C;border-radius:100px;padding:5px 12px;font-size:12px;color:#F28B82;">Kurzfristig: {{ h.kurz }}</span>
+                    <span style="background:#28292C;border-radius:100px;padding:5px 12px;font-size:12px;color:#FDD663;">Mittelfristig: {{ h.mittel }}</span>
+                    <span style="background:#28292C;border-radius:100px;padding:5px 12px;font-size:12px;color:#81C995;">Langfristig: {{ h.lang }}</span>
+                  </div>
+                </sc-if>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-family:'Google Sans',sans-serif;font-size:22px;font-weight:700;color:#8AB4F8;">{{ h.doneCount }}<span style="font-size:13px;color:#9AA0A6;font-weight:400;"> / 66</span></div>
+                <button onClick="{{ h.remove }}" style="background:none;border:none;color:#9AA0A6;font-size:12px;cursor:pointer;padding:2px 0;" style-hover="color:#F28B82;">Löschen</button>
+              </div>
+            </div>
+            <div style="height:6px;background:#28292C;border-radius:100px;margin:12px 0 16px;overflow:hidden;">
+              <div style="height:100%;width:{{ h.pct }};background:linear-gradient(90deg,#8AB4F8,#81C995);border-radius:100px;transition:width .3s ease;"></div>
+            </div>
+            <sc-if value="{{ isStreakView }}" hint-placeholder-val="{{ true }}">
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(30px,1fr));gap:5px;">
+                <sc-for list="{{ h.days }}" as="d" hint-placeholder-count="66">
+                  <button onClick="{{ d.toggle }}" onPointerDown="{{ d.down }}" onPointerUp="{{ d.up }}" onPointerLeave="{{ d.cancel }}" onContextMenu="{{ d.ctx }}" title="{{ d.title }}" style="{{ d.style }}" style-hover="filter:brightness(1.3);">{{ d.wd }}<sc-if value="{{ d.hasComment }}" hint-placeholder-val="{{ false }}"><span style="position:absolute; top:2px; right:2px; width:5px; height:5px; border-radius:50%; background:#FDD663;"></span></sc-if></button>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ isMonthView }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;">
+                  <sc-for list="{{ calWeekdays }}" as="wd" hint-placeholder-count="7">
+                    <div style="text-align:center;font-size:11px;color:#9AA0A6;font-weight:500;">{{ wd }}</div>
+                  </sc-for>
+                </div>
+                <sc-for list="{{ h.monthWeeks }}" as="week" hint-placeholder-count="5">
+                  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;">
+                    <sc-for list="{{ week.cells }}" as="cell" hint-placeholder-count="7">
+                      <sc-if value="{{ cell.empty }}" hint-placeholder-val="{{ false }}">
+                        <div></div>
+                      </sc-if>
+                      <sc-if value="{{ cell.inRange }}" hint-placeholder-val="{{ false }}">
+                        <button onClick="{{ cell.toggle }}" onPointerDown="{{ cell.down }}" onPointerUp="{{ cell.up }}" onPointerLeave="{{ cell.cancel }}" onContextMenu="{{ cell.ctx }}" style="{{ cell.style }}" style-hover="filter:brightness(1.3);">{{ cell.num }}<sc-if value="{{ cell.hasComment }}" hint-placeholder-val="{{ false }}"><span style="position:absolute; top:3px; right:3px; width:6px; height:6px; border-radius:50%; background:#FDD663;"></span></sc-if></button>
+                      </sc-if>
+                      <sc-if value="{{ cell.outOfRange }}" hint-placeholder-val="{{ false }}">
+                        <div style="{{ cell.style }}">{{ cell.num }}</div>
+                      </sc-if>
+                    </sc-for>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ h.disziplin }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:14px;background:#3C2A1E;border-radius:12px;padding:12px 16px;font-size:13px;color:#FDD663;line-height:1.5;">⚡ <b>Tag 10 erreicht — das Motivations-Tal beginnt.</b> Die Motivation lässt jetzt nach. Ab heute zählt nur noch Arbeitsmoral und Disziplin.</div>
+            </sc-if>
+            <sc-if value="{{ h.done }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:14px;background:#28292C;border-radius:12px;padding:12px 16px;font-size:13px;color:#81C995;font-weight:500;">🏆 66 Tage geschafft — diese Gewohnheit gehört jetzt dir.</div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- ============ FREIHEIT & KONTROLLE ============ -->
+    <sc-if value="{{ showFrei }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:fadeIn .3s ease;max-width:820px;" data-screen-label="Freiheit und Kontrolle">
+        <h2 style="font-family:'Google Sans',sans-serif;font-size:22px;font-weight:500;color:#FFFFFF;margin:0 0 6px;">Freiheit &amp; Kontrolle</h2>
+        <div style="font-size:14px;color:#9AA0A6;line-height:1.6;margin-bottom:16px;">Systeme statt Willenskraft. Die Quote zählt — nicht der Streak. Ein Rückfall ist ein Datenpunkt, kein Urteil. Alle Daten bleiben nur auf deinem Gerät.</div>
+        <!-- Unter-Tabs -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;">
+          <sc-for list="{{ freiTabsView }}" as="ft" hint-placeholder-count="3">
+            <button onClick="{{ ft.select }}" style="{{ ft.style }}" style-hover="filter:brightness(1.15);">{{ ft.label }}</button>
+          </sc-for>
+        </div>
+
+        <!-- ===== TAGEBUCH ===== -->
+        <sc-if value="{{ freiShowTagebuch }}" hint-placeholder-val="{{ true }}">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:20px;">
+            <div style="background:#1E1F20;border-radius:16px;padding:14px;text-align:center;">
+              <div style="font-family:'Google Sans',sans-serif;font-size:26px;font-weight:700;color:#81C995;">{{ freiQuote }}</div>
+              <div style="font-size:12px;color:#9AA0A6;">Erfolgsquote</div>
+            </div>
+            <div style="background:#1E1F20;border-radius:16px;padding:14px;text-align:center;">
+              <div style="font-family:'Google Sans',sans-serif;font-size:26px;font-weight:700;color:#8AB4F8;">{{ freiRun }}</div>
+              <div style="font-size:12px;color:#9AA0A6;">Aktuelle Serie</div>
+            </div>
+            <div style="background:#1E1F20;border-radius:16px;padding:14px;text-align:center;">
+              <div style="font-family:'Google Sans',sans-serif;font-size:26px;font-weight:700;color:#C58AF9;">{{ freiBest }}</div>
+              <div style="font-size:12px;color:#9AA0A6;">Beste Serie</div>
+            </div>
+            <div style="background:#1E1F20;border-radius:16px;padding:14px;text-align:center;">
+              <div style="font-family:'Google Sans',sans-serif;font-size:26px;font-weight:700;color:#E3E3E3;">{{ freiTotal }}</div>
+              <div style="font-size:12px;color:#9AA0A6;">Tage getrackt</div>
+            </div>
+          </div>
+
+          <!-- Kalender -->
+          <div style="background:#1E1F20;border-radius:24px;padding:24px;margin-bottom:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+              <div style="font-family:'Google Sans',sans-serif;font-size:15px;font-weight:500;color:#FFFFFF;">Verlauf — Tag antippen zum Zurückblättern</div>
+              <div style="display:flex;align-items:center;gap:12px;">
+                <button onClick="{{ freiCalPrev }}" style="background:#28292C;border:1px solid #3C4043;color:#E3E3E3;border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:14px;">‹</button>
+                <div style="font-family:'Google Sans',sans-serif;font-size:14px;font-weight:500;color:#FFFFFF;min-width:130px;text-align:center;text-transform:capitalize;">{{ freiCalLabel }}</div>
+                <button onClick="{{ freiCalNext }}" style="background:#28292C;border:1px solid #3C4043;color:#E3E3E3;border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:14px;">›</button>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px;">
+              <sc-for list="{{ calWeekdays }}" as="wd" hint-placeholder-count="7">
+                <div style="text-align:center;font-size:11px;color:#9AA0A6;font-weight:500;">{{ wd }}</div>
+              </sc-for>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <sc-for list="{{ freiWeeks }}" as="week" hint-placeholder-count="5">
+                <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;">
+                  <sc-for list="{{ week.cells }}" as="cell" hint-placeholder-count="7">
+                    <sc-if value="{{ cell.empty }}" hint-placeholder-val="{{ false }}">
+                      <div></div>
+                    </sc-if>
+                    <sc-if value="{{ cell.day }}" hint-placeholder-val="{{ false }}">
+                      <button onClick="{{ cell.select }}" title="{{ cell.title }}" style="{{ cell.style }}" style-hover="filter:brightness(1.25);">{{ cell.num }}<sc-if value="{{ cell.hasUrge }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#C58AF9;"></span></sc-if></button>
+                    </sc-if>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-size:12px;color:#9AA0A6;">
+              <span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:3px;background:#81C995;"></span>Clean</span>
+              <span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:3px;background:#FDD663;"></span>Rückfall</span>
+              <span style="display:flex;align-items:center;gap:6px;"><span style="width:6px;height:6px;border-radius:50%;background:#C58AF9;"></span>Urge gemeldet</span>
+            </div>
+          </div>
+
+          <!-- Ausgewählter Tag -->
+          <div style="background:#1E1F20;border-radius:24px;padding:24px;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
+              <div style="font-family:'Google Sans',sans-serif;font-size:15px;font-weight:500;color:#FFFFFF;flex:1;">{{ freiSelLabel }}</div>
+              <sc-if value="{{ freiSelNotToday }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ freiGoToday }}" style="background:transparent;border:1px solid #3C4043;color:#8AB4F8;border-radius:100px;padding:7px 14px;font-family:'Google Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;" style-hover="background:#28292C;">Zu heute springen</button>
+              </sc-if>
+            </div>
+            <div style="font-size:12px;color:#9AA0A6;margin-bottom:16px;">Check-in, Dankbarkeit und Tagebuch für diesen Tag.</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">
+              <button onClick="{{ freiMarkClean }}" style="{{ freiCleanStyle }}" style-hover="filter:brightness(1.15);">✓ Clean</button>
+              <button onClick="{{ freiMarkFall }}" style="{{ freiFallStyle }}" style-hover="filter:brightness(1.15);">Rückfall — ehrlich eintragen</button>
+            </div>
+            <sc-if value="{{ freiSelFall }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#3C2A1E;border:1px solid #FDD663;border-radius:12px;padding:12px 16px;font-size:13px;color:#FDD663;line-height:1.6;margin-bottom:18px;">Ein Rückfall ist ein Datenpunkt, kein Urteil. Melde den Urge im <button onClick="{{ freiGoUrge }}" style="background:none;border:none;color:#8AB4F8;font-size:13px;font-weight:500;cursor:pointer;padding:0;text-decoration:underline;">⚡ Urge-Tracker</button> — mit Situation, Uhrzeit, Gerät und Gefühl davor. So findest du die Lücke im System.</div>
+            </sc-if>
+            <div style="margin-bottom:16px;">
+              <div style="font-size:12px;font-weight:500;color:#81C995;letter-spacing:0.5px;margin-bottom:6px;">DANKBARKEIT — 3 DINGE, TÄGLICH</div>
+              <textarea value="{{ freiDank }}" onChange="{{ freiSetDank }}" placeholder="1. …&#10;2. …&#10;3. …" rows="3" style="width:100%;background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:14px;line-height:1.7;padding:14px;resize:vertical;"></textarea>
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:500;color:#8AB4F8;letter-spacing:0.5px;margin-bottom:6px;">TAGEBUCH — WIE WAR DER TAG?</div>
+              <textarea value="{{ freiDiary }}" onChange="{{ freiSetDiary }}" placeholder="Was ist passiert? Wie ging es dir? Was hast du gelernt?" rows="5" style="width:100%;background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:14px;line-height:1.7;padding:14px;resize:vertical;"></textarea>
+            </div>
+            <sc-if value="{{ freiSelHasUrges }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:16px;font-size:13px;color:#C58AF9;">⚡ {{ freiSelUrgeCount }} Urge(s) an diesem Tag gemeldet — Details im <button onClick="{{ freiGoUrge }}" style="background:none;border:none;color:#8AB4F8;font-size:13px;font-weight:500;cursor:pointer;padding:0;text-decoration:underline;">Urge-Tracker</button></div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <!-- ===== URGE-TRACKER ===== -->
+        <sc-if value="{{ freiShowUrge }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#3C1F1E;border:1px solid #F28B82;border-radius:16px;padding:14px 18px;font-size:13px;color:#F28B82;line-height:1.6;margin-bottom:20px;"><b>„Nur ein kurzer Blick" ist eine Illusion.</b> Er startet den gesamten Kreislauf neu. Es gibt keinen harmlosen Blick — nur die Entscheidung davor.</div>
+
+        <!-- Soforthilfe -->
+        <div style="background:#1E1F20;border-radius:24px;padding:24px;margin-bottom:20px;">
+          <div style="font-family:'Google Sans',sans-serif;font-size:15px;font-weight:500;color:#FFFFFF;margin-bottom:4px;">🚨 Bei akutem Drang — zuerst das</div>
+          <div style="font-size:13px;color:#9AA0A6;line-height:1.6;margin-bottom:14px;"><b style="color:#E3E3E3;">3-Sekunden-Regel:</b> Riskanter Gedanke oder Bild? Innerhalb von 3 Sekunden bewusst wegdrehen — danach hat der Autopilot übernommen. Dann Energie umleiten:</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <span style="background:#28292C;border:1px solid #3C4043;border-radius:100px;padding:10px 18px;font-size:13px;color:#E3E3E3;">🏋️ Sport / Liegestütze</span>
+            <span style="background:#28292C;border:1px solid #3C4043;border-radius:100px;padding:10px 18px;font-size:13px;color:#E3E3E3;">🌲 Raus in die Natur</span>
+            <span style="background:#28292C;border:1px solid #3C4043;border-radius:100px;padding:10px 18px;font-size:13px;color:#E3E3E3;">🚿 Kalte Dusche</span>
+            <span style="background:#28292C;border:1px solid #3C4043;border-radius:100px;padding:10px 18px;font-size:13px;color:#E3E3E3;">📞 Buddy anrufen</span>
+          </div>
+        </div>
+
+        <!-- Urge melden -->
+        <sc-if value="{{ urgeFormClosed }}" hint-placeholder-val="{{ true }}">
+          <button onClick="{{ urgeOpen }}" style="width:100%;background:#8AB4F8;color:#131314;border:none;border-radius:16px;padding:16px 24px;font-family:'Google Sans',sans-serif;font-size:15px;font-weight:500;cursor:pointer;margin-bottom:24px;" style-hover="background:#AECBFA;">⚡ Urge melden</button>
+        </sc-if>
+        <sc-if value="{{ urgeFormOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#1E1F20;border:1px solid #8AB4F8;border-radius:24px;padding:24px;margin-bottom:24px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;">
+              <div style="font-family:'Google Sans',sans-serif;font-size:15px;font-weight:500;color:#FFFFFF;">⚡ {{ urgeFormTitle }}</div>
+              <button onClick="{{ urgeCancel }}" style="background:#28292C;border:none;color:#E3E3E3;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:13px;" style-hover="background:#37383B;">✕</button>
+            </div>
+            <div style="font-size:12px;font-weight:500;color:#BDC1C6;letter-spacing:0.5px;margin-bottom:8px;">WIE IST ES AUSGEGANGEN?</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">
+              <button onClick="{{ urgeSetRes }}" style="{{ urgeResStyle }}" style-hover="filter:brightness(1.15);">✓ Widerstanden</button>
+              <button onClick="{{ urgeSetGave }}" style="{{ urgeGaveStyle }}" style-hover="filter:brightness(1.15);">Nachgegeben — ehrlich eintragen</button>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:16px;margin-bottom:18px;">
+              <div>
+                <div style="font-size:12px;font-weight:500;color:#BDC1C6;letter-spacing:0.5px;margin-bottom:6px;">UHRZEIT</div>
+                <input type="time" value="{{ urgeTime }}" onChange="{{ urgeSetTime }}" style="background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-size:14px;padding:10px 14px;font-family:inherit;color-scheme:dark;width:100%;box-sizing:border-box;">
+              </div>
+              <div>
+                <div style="font-size:12px;font-weight:500;color:#BDC1C6;letter-spacing:0.5px;margin-bottom:6px;">INTENSITÄT DES DRANGS</div>
+                <div style="display:flex;align-items:center;gap:12px;min-height:41px;">
+                  <span style="font-size:12px;color:#9AA0A6;">1</span>
+                  <input type="range" min="1" max="10" step="1" value="{{ urgeIntensity }}" onChange="{{ urgeSetIntensity }}" style="flex:1;cursor:pointer;">
+                  <span style="font-size:12px;color:#9AA0A6;">10</span>
+                  <span style="font-family:'Google Sans',sans-serif;font-size:16px;font-weight:700;color:#8AB4F8;min-width:24px;text-align:right;">{{ urgeIntensity }}</span>
+                </div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:16px;margin-bottom:18px;">
+              <div>
+                <div style="font-size:12px;font-weight:500;color:#BDC1C6;letter-spacing:0.5px;margin-bottom:6px;">SITUATION</div>
+                <textarea value="{{ urgeSituation }}" onChange="{{ urgeSetSituation }}" placeholder="z. B. allein zuhause, gelangweilt" rows="2" style="width:100%;background:#28292C;border:1px solid #3C4043;border-radius:10px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:13px;line-height:1.5;padding:10px;resize:vertical;box-sizing:border-box;"></textarea>
+              </div>
+              <div>
+                <div style="font-size:12px;font-weight:500;color:#BDC1C6;letter-spacing:0.5px;margin-bottom:6px;">GERÄT</div>
+                <textarea value="{{ urgeGeraet }}" onChange="{{ urgeSetGeraet }}" placeholder="z. B. Handy im Bett" rows="2" style="width:100%;background:#28292C;border:1px solid #3C4043;border-radius:10px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:13px;line-height:1.5;padding:10px;resize:vertical;box-sizing:border-box;"></textarea>
+              </div>
+            </div>
+            <div style="font-size:12px;font-weight:500;color:#8AB4F8;letter-spacing:0.5px;margin-bottom:8px;">HALT-CHECK: WAS IST GERADE WIRKLICH LOS?</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+              <sc-for list="{{ urgeHalt }}" as="x" hint-placeholder-count="4">
+                <button onClick="{{ x.toggle }}" style="{{ x.style }}" style-hover="filter:brightness(1.15);">{{ x.label }}</button>
+              </sc-for>
+            </div>
+            <div style="font-size:13px;color:{{ urgeHaltHintColor }};margin-bottom:16px;">{{ urgeHaltHint }}</div>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#BDC1C6;">
+              <input type="checkbox" checked="{{ urgeUmgebung }}" onChange="{{ urgeToggleUmgebung }}" style="width:18px;height:18px;accent-color:#81C995;cursor:pointer;">
+              Umgebungs-Check: Filter aktiv, Trigger minimiert (Handy nachts raus, kein zielloses Surfen)
+            </label>
+            <sc-if value="{{ urgeIsGave }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#28292C;border-radius:16px;padding:18px;margin-top:16px;">
+                <div style="font-size:12px;font-weight:500;color:#FDD663;letter-spacing:0.5px;margin-bottom:2px;">RÜCKFALL-ANALYSE — NEUTRALER DATENPUNKT</div>
+                <div style="font-size:12px;color:#9AA0A6;line-height:1.5;margin-bottom:14px;">Wo war die Lücke im System? Keine Selbstvorwürfe — nur Daten, die dir helfen, das System zu verbessern.</div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px;">
+                  <div>
+                    <div style="font-size:11px;font-weight:500;color:#BDC1C6;letter-spacing:0.5px;margin-bottom:5px;">GEFÜHL / KURZ DAVOR</div>
+                    <textarea value="{{ urgeGefuehl }}" onChange="{{ urgeSetGefuehl }}" placeholder="z. B. gestresst, einsam, Streit gehabt" rows="2" style="width:100%;background:#1E1F20;border:1px solid #3C4043;border-radius:10px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:13px;line-height:1.5;padding:10px;resize:vertical;"></textarea>
+                  </div>
+                  <div>
+                    <div style="font-size:11px;font-weight:500;color:#BDC1C6;letter-spacing:0.5px;margin-bottom:5px;">WAS HÄTTE GEHOLFEN?</div>
+                    <textarea value="{{ urgeHilfe }}" onChange="{{ urgeSetHilfe }}" placeholder="z. B. Handy nicht mit ins Bett, früher schlafen" rows="2" style="width:100%;background:#1E1F20;border:1px solid #3C4043;border-radius:10px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:13px;line-height:1.5;padding:10px;resize:vertical;"></textarea>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ urgeIsRes }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:16px;">
+                <div style="font-size:12px;font-weight:500;color:#81C995;letter-spacing:0.5px;margin-bottom:6px;">WAS HAT GEHOLFEN?</div>
+                <textarea value="{{ urgeHilfe }}" onChange="{{ urgeSetHilfe }}" placeholder="z. B. kalte Dusche, rausgegangen, Buddy angerufen, 3-Sekunden-Regel" rows="2" style="width:100%;background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:13px;line-height:1.5;padding:12px;resize:vertical;"></textarea>
+              </div>
+            </sc-if>
+            <div style="display:flex;gap:10px;margin-top:18px;">
+              <button onClick="{{ urgeSave }}" style="background:#8AB4F8;color:#131314;border:none;border-radius:100px;padding:11px 24px;font-family:'Google Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;" style-hover="background:#AECBFA;">Speichern</button>
+              <button onClick="{{ urgeCancel }}" style="background:transparent;border:1px solid #3C4043;color:#9AA0A6;border-radius:100px;padding:11px 24px;font-family:'Google Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;" style-hover="background:#28292C;">Abbrechen</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- Urge-Verlauf -->
+        <div style="font-family:'Google Sans',sans-serif;font-size:15px;font-weight:500;color:#FFFFFF;margin-bottom:12px;">Gemeldete Urges</div>
+        <sc-if value="{{ urgesEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px dashed #3C4043;border-radius:16px;padding:28px;text-align:center;color:#9AA0A6;font-size:13px;">Noch keine Urges gemeldet. Jeder gemeldete Urge — widerstanden oder nicht — ist ein Datenpunkt, der dein System besser macht.</div>
+        </sc-if>
+        <sc-for list="{{ urgeDays }}" as="ud" hint-placeholder-count="2">
+          <div style="margin-bottom:18px;">
+            <div style="font-family:'Google Sans',sans-serif;font-size:13px;font-weight:500;color:#8AB4F8;margin-bottom:8px;">{{ ud.label }}</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <sc-for list="{{ ud.items }}" as="u" hint-placeholder-count="1">
+                <div style="background:#1E1F20;border-radius:16px;padding:14px 18px;">
+                  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <span style="font-size:12px;color:#9AA0A6;font-family:monospace;">{{ u.time }}</span>
+                    <span style="{{ u.badgeStyle }}">{{ u.badge }}</span>
+                    <span style="font-size:12px;color:#9AA0A6;flex:1;min-width:120px;">{{ u.meta }}</span>
+                    <button onClick="{{ u.edit }}" title="Eintrag bearbeiten" style="background:none;border:none;color:#5F6368;cursor:pointer;font-size:13px;padding:2px;" style-hover="color:#8AB4F8;">✎</button>
+                    <button onClick="{{ u.remove }}" title="Eintrag löschen" style="background:none;border:none;color:#5F6368;cursor:pointer;font-size:13px;padding:2px;" style-hover="color:#F28B82;">✕</button>
+                  </div>
+                  <sc-if value="{{ u.hasDetails }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size:13px;color:#BDC1C6;line-height:1.6;margin-top:8px;">{{ u.details }}</div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+        </sc-if>
+
+        <!-- ===== GENERELL ===== -->
+        <sc-if value="{{ freiShowGenerell }}" hint-placeholder-val="{{ false }}">
+
+        <!-- 3-Kreise -->
+        <div style="background:#1E1F20;border-radius:24px;padding:24px;margin-bottom:20px;">
+          <div style="font-family:'Google Sans',sans-serif;font-size:15px;font-weight:500;color:#FFFFFF;margin-bottom:4px;">Das 3-Kreise-Modell (Boundary-Planer)</div>
+          <div style="font-size:13px;color:#9AA0A6;line-height:1.6;margin-bottom:16px;">Definiere deine Grenzen, solange du klar denkst — nicht erst im Drang.</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px;">
+            <div>
+              <div style="font-size:12px;font-weight:500;color:#F28B82;letter-spacing:0.5px;margin-bottom:6px;">🔴 INNER CIRCLE — TABU</div>
+              <textarea value="{{ freiInner }}" onChange="{{ freiSetInner }}" placeholder="z. B. Pornokonsum, bewusstes Suchen nach triggernden Inhalten" rows="4" style="width:100%;background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:13px;line-height:1.5;padding:12px;resize:vertical;"></textarea>
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:500;color:#FDD663;letter-spacing:0.5px;margin-bottom:6px;">🟡 MIDDLE CIRCLE — VORSTUFEN</div>
+              <textarea value="{{ freiMiddle }}" onChange="{{ freiSetMiddle }}" placeholder="z. B. zielloses Surfen spätabends, allein mit Laptop im Schlafzimmer, Social-Media-Doomscrolling" rows="4" style="width:100%;background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:13px;line-height:1.5;padding:12px;resize:vertical;"></textarea>
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:500;color:#81C995;letter-spacing:0.5px;margin-bottom:6px;">🟢 OUTER CIRCLE — STÄRKEND</div>
+              <textarea value="{{ freiOuter }}" onChange="{{ freiSetOuter }}" placeholder="z. B. Sport, Zeit mit meiner Frau, Lesen, früh schlafen, Hobbys" rows="4" style="width:100%;background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:13px;line-height:1.5;padding:12px;resize:vertical;"></textarea>
+            </div>
+          </div>
+          <div style="margin-top:16px;">
+            <div style="font-size:12px;font-weight:500;color:#C58AF9;letter-spacing:0.5px;margin-bottom:6px;">BOOKENDING — RISKANTE SITUATIONEN VORAUSPLANEN</div>
+            <textarea value="{{ freiBookend }}" onChange="{{ freiSetBookend }}" placeholder="z. B. Geschäftsreise nächste Woche: Vorab-Check-in mit Buddy am Montag, Laptop bleibt abends im Koffer, Nachbesprechung am Freitag." rows="3" style="width:100%;background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:13px;line-height:1.5;padding:12px;resize:vertical;"></textarea>
+          </div>
+        </div>
+
+        <!-- Mein Warum + Beast -->
+        <div style="background:#1E1F20;border-radius:24px;padding:24px;margin-bottom:20px;">
+          <div style="font-family:'Google Sans',sans-serif;font-size:15px;font-weight:500;color:#FFFFFF;margin-bottom:4px;">Mein Warum — in meinen eigenen Worten</div>
+          <div style="font-size:13px;color:#9AA0A6;line-height:1.6;margin-bottom:16px;">Deine eigenen Gründe wirken stärker als jede fremde Liste. Schreib konkret und ehrlich.</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px;">
+            <div>
+              <div style="font-size:12px;font-weight:500;color:#F28B82;letter-spacing:0.5px;margin-bottom:6px;">WAS ES MICH WIRKLICH KOSTET</div>
+              <textarea value="{{ freiKosten }}" onChange="{{ freiSetKosten }}" placeholder="z. B. Distanz zu meiner Frau, Brain Fog, verschwendete Abende, Scham am nächsten Morgen …" rows="5" style="width:100%;background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:13px;line-height:1.5;padding:12px;resize:vertical;"></textarea>
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:500;color:#81C995;letter-spacing:0.5px;margin-bottom:6px;">WAS ICH ZURÜCKGEWINNE</div>
+              <textarea value="{{ freiGewinn }}" onChange="{{ freiSetGewinn }}" placeholder="z. B. echte Nähe zu meiner Frau, klarer Kopf, Selbstrespekt, Zeit und Energie für meine Ziele …" rows="5" style="width:100%;background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:13px;line-height:1.5;padding:12px;resize:vertical;"></textarea>
+            </div>
+          </div>
+          <div style="margin-top:16px;">
+            <div style="font-size:12px;font-weight:500;color:#8AB4F8;letter-spacing:0.5px;margin-bottom:6px;">DAS „BEAST" ENTLARVEN — DIE SUCHTSTIMME BIN NICHT ICH</div>
+            <textarea value="{{ freiBeast }}" onChange="{{ freiSetBeast }}" placeholder="Welche Lügen erzählt dir die Suchtstimme? (&quot;Nur einmal noch&quot;, &quot;Du hast es verdient&quot;, &quot;Es merkt ja keiner&quot;) — und was ist die rationale Antwort darauf?" rows="4" style="width:100%;background:#28292C;border:1px solid #3C4043;border-radius:12px;color:#E3E3E3;font-family:'Google Sans Text','Roboto',sans-serif;font-size:13px;line-height:1.5;padding:12px;resize:vertical;"></textarea>
+          </div>
+        </div>
+
+        </sc-if>
+      </div>
+    </sc-if>
+
+  </main>
+</div>
+
+<sc-if value="{{ logOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closeLog }}" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:180;"></div>
+  <div style="position:fixed;top:0;right:0;bottom:0;z-index:181;width:min(420px,100vw);background:#1E1F20;box-shadow:-8px 0 32px rgba(0,0,0,.5);display:flex;flex-direction:column;font-family:'Google Sans Text','Roboto',sans-serif;" data-screen-label="Änderungsverlauf">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 24px;border-bottom:1px solid #2D2E30;">
+      <div>
+        <div style="font-family:'Google Sans',sans-serif;font-size:17px;font-weight:500;color:#FFFFFF;">Änderungsverlauf</div>
+        <div style="font-size:12px;color:#9AA0A6;margin-top:2px;">Alles wird automatisch gespeichert — hier siehst du wann.</div>
+      </div>
+      <button onClick="{{ closeLog }}" style="background:#28292C;border:none;color:#E3E3E3;border-radius:50%;width:34px;height:34px;cursor:pointer;font-size:15px;flex-shrink:0;" style-hover="background:#37383B;">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px 24px;">
+      <sc-if value="{{ logEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="border:1px dashed #3C4043;border-radius:16px;padding:32px;text-align:center;color:#9AA0A6;font-size:13px;">Noch keine Änderungen aufgezeichnet. Sobald du etwas bearbeitest, erscheint es hier.</div>
+      </sc-if>
+      <sc-for list="{{ logDays }}" as="ld" hint-placeholder-count="2">
+        <div style="margin-bottom:20px;">
+          <div style="font-family:'Google Sans',sans-serif;font-size:13px;font-weight:500;color:#8AB4F8;letter-spacing:0.3px;margin-bottom:8px;">{{ ld.dayLabel }}</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <sc-for list="{{ ld.entries }}" as="le" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:10px;background:#28292C;border-radius:12px;padding:10px 14px;">
+                <span style="font-size:12px;color:#9AA0A6;font-family:monospace;flex-shrink:0;">{{ le.time }}</span>
+                <span style="flex:1;font-size:13px;color:#E3E3E3;">{{ le.label }}</span>
+                <span style="font-size:11px;color:#9AA0A6;flex-shrink:0;">{{ le.count }}</span>
+                <button onClick="{{ le.remove }}" title="Eintrag entfernen" style="background:none;border:none;color:#5F6368;cursor:pointer;font-size:13px;padding:2px;flex-shrink:0;" style-hover="color:#F28B82;">✕</button>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="padding:14px 24px;border-top:1px solid #2D2E30;display:flex;justify-content:flex-end;">
+      <button onClick="{{ clearLog }}" style="background:transparent;border:1px solid #5F2120;color:#F28B82;border-radius:100px;padding:9px 18px;font-family:'Google Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;" style-hover="background:#3C1F1E;">Verlauf löschen</button>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ commentOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closeComment }}" style="position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:200;"></div>
+  <div style="position:fixed; left:0; right:0; bottom:0; z-index:201; background:#1E1F22; border-radius:20px 20px 0 0; padding:20px 20px calc(20px + env(safe-area-inset-bottom)); box-sizing:border-box; max-width:520px; margin:0 auto; box-shadow:0 -8px 32px rgba(0,0,0,.5); font-family:'Google Sans Text','Google Sans',system-ui,sans-serif;">
+    <div style="width:36px; height:4px; border-radius:2px; background:#4A4C4F; margin:0 auto 16px;"></div>
+    <div style="display:flex; flex-direction:column; gap:2px; margin-bottom:12px;">
+      <div style="font-size:16px; font-weight:600; color:#E8EAED;">💬 {{ commentTitle }}</div>
+      <div style="font-size:13px; color:#9AA0A6;">{{ commentSub }}</div>
+    </div>
+    <textarea value="{{ commentText }}" onChange="{{ setCommentText }}" placeholder="Notiz zu diesem Tag …" rows="3" style="width:100%; box-sizing:border-box; background:#28292C; border:1px solid #3C4043; border-radius:12px; color:#E8EAED; font-size:15px; font-family:inherit; padding:12px; resize:none; outline:none;"></textarea>
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      <sc-if value="{{ commentHasExisting }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ deleteComment }}" style="flex:0 0 auto; min-height:44px; padding:0 16px; border-radius:22px; border:1px solid #5F2120; background:transparent; color:#F28B82; font-size:14px; font-weight:500; cursor:pointer;">Löschen</button>
+      </sc-if>
+      <button onClick="{{ closeComment }}" style="flex:1; min-height:44px; border-radius:22px; border:1px solid #3C4043; background:transparent; color:#9AA0A6; font-size:14px; font-weight:500; cursor:pointer;">Abbrechen</button>
+      <button onClick="{{ saveComment }}" style="flex:1; min-height:44px; border-radius:22px; border:none; background:#8AB4F8; color:#131314; font-size:14px; font-weight:600; cursor:pointer;">Speichern</button>
+    </div>
+  </div>
+</sc-if></x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;jahr&quot;: { &quot;editor&quot;: &quot;int&quot;, &quot;default&quot;: 2026, &quot;tsType&quot;: &quot;number&quot;, &quot;min&quot;: 2024, &quot;max&quot;: 2040 },
+  &quot;maxFokus&quot;: { &quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 2, &quot;tsType&quot;: &quot;number&quot;, &quot;min&quot;: 1, &quot;max&quot;: 3, &quot;step&quot;: 1 }
+}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const AREAS = [
+      { id: 'koerper', name: 'Körper & Geist', color: '#8AB4F8', placeholder: 'Ich fühle mich unbesiegbar. Nichts kann mir etwas anhaben, ich durchstehe jede Krise und jedes körperliche Gebrechen (Terminator-Modus).', goalPlaceholder: 'z. B. Zweimal die Woche Laufen, zweimal die Woche Fitnessstudio, einen Halbmarathon laufen, einen HYROX-Wettkampf absolvieren.' },
+      { id: 'soziales', name: 'Soziales', color: '#81C995', placeholder: 'Ein enger Kreis echter Freunde, den ich regelmäßig sehe und auf den ich mich zu 100 % verlassen kann.', goalPlaceholder: 'z. B. Einmal im Monat ein Treffen mit Freunden organisieren, zwei alte Kontakte reaktivieren, einem Verein beitreten.' },
+      { id: 'liebe', name: 'Liebe', color: '#F28B82', placeholder: 'Verheiratet, eine Frau, die mich unterstützt, wo man füreinander da ist.', goalPlaceholder: 'z. B. Jede Woche ein fester Date-Abend, einmal im Quartal ein Wochenendtrip zu zweit, jeden Tag ein ehrliches Gespräch ohne Handy.' },
+      { id: 'finanzen', name: 'Finanzen', color: '#FDD663', placeholder: 'Ein spezifischer Bestand an Immobilien und Barvermögen, sodass ich nie wieder arbeiten muss und von meinem Leben zehren kann.', goalPlaceholder: 'z. B. Sparquote auf 30 % erhöhen, 12.000 € Notgroschen aufbauen, monatlich 500 € in ETFs investieren, erstes Immobilien-Exposé prüfen.' },
+      { id: 'karriere', name: 'Karriere', color: '#C58AF9', placeholder: 'Ich arbeite an Projekten, die mich fordern, mit voller Autonomie — und werde dafür exzellent bezahlt.', goalPlaceholder: 'z. B. Gehaltsgespräch bis Q2 führen, eine Zertifizierung abschließen, ein eigenes Projekt verantworten, 2 Fachbücher lesen.' },
+      { id: 'sinn', name: 'Sinn', color: '#78D9EC', placeholder: 'Mindestens für X Euro Futter an Tierheime spenden und diese aktiv besuchen.', goalPlaceholder: 'z. B. 500 € Futter an Tierheime spenden, viermal im Jahr persönlich ein Tierheim besuchen, einen monatlichen Spenden-Dauerauftrag einrichten.' },
+    ];
+    this.AREAS = AREAS;
+    let initYear = Number(localStorage.getItem('lebensplaner-year')) || (props.jahr ?? 2026);
+    this.state = this.loadYear(initYear);
+    try { this.log = JSON.parse(localStorage.getItem('lebensplaner-log')) || []; } catch (e) { this.log = []; }
+    if (!Array.isArray(this.log)) this.log = [];
+    // Habit Tracker & Freiheit laufen jahresübergreifend — global gespeichert, nicht pro Jahr.
+    let g = null;
+    try { g = JSON.parse(localStorage.getItem('lebensplaner-global')); } catch (e) {}
+    if (!g) {
+      // Migration: falls im alten pro-Jahr-Speicher schon Habits/Frei existieren, übernehmen
+      let old = null;
+      try { old = JSON.parse(localStorage.getItem('lebensplaner-y' + initYear)) || JSON.parse(localStorage.getItem('lebensplaner-v1')); } catch (e) {}
+      g = {
+        habits: (old && old.habits) || [
+          { id: 1, name: 'Fitnessstudio', wenn: 'Montag 19:00 Uhr ist', dann: 'bin ich im Fitnessstudio', kurz: 'Anstrengend, keine Lust', mittel: 'Besseres Körpergefühl', lang: 'Gesundes, energiegeladenes Leben', startDate: this.daysAgoISO(11), days: Array(66).fill(false).map((_, i) => i < 12 && i !== 5) },
+          { id: 2, name: 'Laufen', wenn: 'Samstag 9:00 Uhr ist', dann: 'laufe ich 8 km', kurz: 'Überwindung, kalt draußen', mittel: 'Mehr Ausdauer', lang: 'Halbmarathon & HYROX schaffen', startDate: this.daysAgoISO(7), days: Array(66).fill(false).map((_, i) => i < 8) },
+        ],
+        frei: (old && old.frei) || { log: {}, notes: {}, inner: '', middle: '', outer: '', bookend: '', beast: '', kosten: '', gewinn: '', dank: {}, umgebung: {} },
+        habitViewMode: (old && old.habitViewMode) || 'streak',
+        calYear: (old && old.calYear) ?? new Date().getFullYear(),
+        calMonth: (old && old.calMonth) ?? new Date().getMonth(),
+        newHabitName: '', newHabitWenn: '', newHabitDann: '',
+        newHabitKurz: '', newHabitMittel: '', newHabitLang: '', overloadWarn: false,
+      };
+      try { localStorage.setItem('lebensplaner-global', JSON.stringify(g)); } catch (e) {}
+    }
+    this.global = g;
+    // Migration: alte Rückfall-Notizen → Urge-Einträge, neue Felder anlegen
+    const fr0 = this.global.frei || { log: {}, notes: {}, inner: '', middle: '', outer: '', bookend: '', beast: '', kosten: '', gewinn: '', dank: {}, umgebung: {} };
+    if (!fr0.urges) {
+      const migUrges = Object.entries(fr0.notes || {}).map(([d, n], i) => ({
+        id: i + 1, date: d, time: (n && n.uhrzeit) || '', outcome: 'gave', intensity: null, halt: {},
+        umgebung: !!((fr0.umgebung || {})[d]),
+        situation: (n && n.situation) || '', geraet: (n && n.geraet) || '', gefuehl: (n && n.gefuehl) || '', hilfe: '',
+      }));
+      this.global = { ...this.global, frei: { ...fr0, urges: migUrges, diary: fr0.diary || {} } };
+      try { localStorage.setItem('lebensplaner-global', JSON.stringify(this.global)); } catch (e) {}
+    }
+  }
+
+  saveGlobal(patch) {
+    this.global = { ...this.global, ...patch };
+    try { localStorage.setItem('lebensplaner-global', JSON.stringify(this.global)); } catch (e) {}
+    this.recordLog(patch);
+    this.forceUpdate();
+  }
+
+  freshState(year) {
+    return {
+      year, tab: 'dashboard',
+      scores: { koerper: 5, soziales: 5, liebe: 5, finanzen: 5, karriere: 5, sinn: 5 },
+      visions: {}, focus: [], goals: {},
+      overloadWarn: false, goalStatus: {}, reflexions: {},
+    };
+  }
+
+  loadYear(y) {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem('lebensplaner-y' + y)); } catch (e) {}
+    if (!saved) {
+      // Migration: alte einjährige Speicherung übernehmen
+      try { saved = JSON.parse(localStorage.getItem('lebensplaner-v1')); } catch (e) {}
+      if (saved) try { localStorage.removeItem('lebensplaner-v1'); } catch (e) {}
+    }
+    const st = Object.assign(this.freshState(y), saved || {});
+    st.year = y;
+    if (st.tab === 'reflexion') st.tab = 'fokus';
+    if (!st.reflexions) st.reflexions = {};
+    if (!st.tab) st.tab = 'dashboard';
+    delete st.habits; delete st.frei; delete st.habitViewMode; delete st.calYear; delete st.calMonth;
+    delete st.newHabitName; delete st.newHabitWenn; delete st.newHabitDann;
+    delete st.newHabitKurz; delete st.newHabitMittel; delete st.newHabitLang; delete st.overloadWarn;
+    return st;
+  }
+
+  switchYear(delta) {
+    const cur = this.state;
+    const y = cur.year + delta;
+    if (y < 2020 || y > 2100) return;
+    try { localStorage.setItem('lebensplaner-y' + cur.year, JSON.stringify(cur)); } catch (e) {}
+    let next;
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem('lebensplaner-y' + y)); } catch (e) {}
+    if (saved) {
+      next = Object.assign(this.freshState(y), saved, { year: y });
+    } else {
+      // Neues Jahr: Visionen & Bewertungen als Startpunkt übernehmen
+      next = this.freshState(y);
+      next.scores = { ...cur.scores };
+      next.visions = { ...cur.visions };
+      next.focus = [...cur.focus];
+      next.goals = {};
+    }
+    next.tab = cur.tab;
+    this.commentTarget = null;
+    this.setState(next, () => {
+      try {
+        localStorage.setItem('lebensplaner-year', String(y));
+        localStorage.setItem('lebensplaner-y' + y, JSON.stringify(this.state));
+      } catch (e) {}
+    });
+  }
+
+  set(patch) {
+    this.setState(patch, () => {
+      try {
+        localStorage.setItem('lebensplaner-y' + this.state.year, JSON.stringify(this.state));
+        localStorage.setItem('lebensplaner-year', String(this.state.year));
+      } catch (e) {}
+      this.recordLog(patch);
+    });
+  }
+
+  // Für Habit Tracker & Freiheit: laufen jahresübergreifend, gehen in den globalen Speicher statt in state
+  setGlobal(patch) {
+    this.saveGlobal(patch);
+  }
+
+  recordLog(patch) {
+    const LABELS = {
+      scores: 'Lebensbereich-Bewertung geändert',
+      visions: '„10 von 10"-Vision bearbeitet',
+      focus: 'Jahresfokus angepasst',
+      goals: 'Jahresziele bearbeitet',
+      habits: 'Habit Tracker aktualisiert',
+      goalStatus: 'Zielstatus geändert',
+      reflexions: 'Reflexion bearbeitet',
+      frei: 'Freiheit & Kontrolle aktualisiert',
+    };
+    const labels = [...new Set(Object.keys(patch).map((k) => LABELS[k]).filter(Boolean))];
+    if (!labels.length) return;
+    const now = new Date();
+    const day = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    for (const label of labels) {
+      const last = this.log[0];
+      if (last && last.day === day && last.label === label && last.year === this.state.year) {
+        last.t = now.getTime(); last.n = (last.n || 1) + 1;
+      } else {
+        this.log.unshift({ day, t: now.getTime(), label, year: this.state.year, n: 1 });
+      }
+    }
+    if (this.log.length > 400) this.log = this.log.slice(0, 400);
+    try { localStorage.setItem('lebensplaner-log', JSON.stringify(this.log)); } catch (e) {}
+    this.savedAt = now;
+    clearTimeout(this.saveFlashTimer);
+    this.saveFlash = true;
+    this.saveFlashTimer = setTimeout(() => { this.saveFlash = false; this.forceUpdate(); }, 1800);
+    this.forceUpdate();
+  }
+
+  saveLog() {
+    try { localStorage.setItem('lebensplaner-log', JSON.stringify(this.log)); } catch (e) {}
+    this.forceUpdate();
+  }
+
+  logVals() {
+    const savedAt = this.savedAt;
+    const timeStr = savedAt ? savedAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
+    const base = {
+      saveLabel: this.saveFlash ? '✓ Gespeichert' : (savedAt ? '✓ ' + timeStr : '🕘 Verlauf'),
+      saveStyle: {
+        background: this.saveFlash ? '#0F3D2E' : 'transparent',
+        color: this.saveFlash ? '#81C995' : '#9AA0A6',
+        border: '1px solid ' + (this.saveFlash ? '#81C995' : '#3C4043'),
+        borderRadius: '100px', padding: '8px 14px', whiteSpace: 'nowrap', flexShrink: 0,
+        fontFamily: "'Google Sans',sans-serif", fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+        transition: 'all .25s ease',
+      },
+      openLog: () => { this.logOpen = true; this.forceUpdate(); },
+      closeLog: () => { this.logOpen = false; this.forceUpdate(); },
+    };
+    if (!this.logOpen) return { ...base, logOpen: false };
+    const todayKey = new Date();
+    const fmtDay = (dayISO) => {
+      const d = new Date(dayISO + 'T00:00:00');
+      const diff = Math.round((new Date(todayKey.getFullYear(), todayKey.getMonth(), todayKey.getDate()) - d) / 86400000);
+      const dateStr = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      if (diff === 0) return 'Heute · ' + dateStr;
+      if (diff === 1) return 'Gestern · ' + dateStr;
+      return dateStr;
+    };
+    const groups = [];
+    for (const e of this.log) {
+      let g = groups.find((x) => x.day === e.day);
+      if (!g) { g = { day: e.day, dayLabel: fmtDay(e.day), entries: [] }; groups.push(g); }
+      g.entries.push({
+        time: new Date(e.t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+        label: e.label + (e.year !== this.state.year ? ' (' + e.year + ')' : ''),
+        count: (e.n || 1) > 1 ? e.n + '×' : '',
+        remove: () => { this.log = this.log.filter((x) => x !== e); this.saveLog(); },
+      });
+    }
+    return {
+      ...base,
+      logOpen: true,
+      logEmpty: groups.length === 0,
+      logDays: groups,
+      clearLog: () => { this.log = []; this.saveLog(); },
+    };
+  }
+
+  daysAgoISO(n) {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  dateFromStart(startDateISO, i) {
+    const d = new Date((startDateISO || this.daysAgoISO(0)) + 'T00:00:00');
+    d.setDate(d.getDate() + i);
+    return d;
+  }
+
+  openComment(habitId, idx) {
+    const h = this.global.habits.find((x) => x.id === habitId);
+    this.commentTarget = { habitId, idx };
+    this.commentDraft = ((h && h.comments) || {})[idx] || '';
+    this.forceUpdate();
+  }
+
+  pressHandlers(habitId, idx, toggle) {
+    return {
+      down: () => {
+        this.lpFired = false;
+        clearTimeout(this.lpTimer);
+        this.lpTimer = setTimeout(() => {
+          this.lpFired = true;
+          try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
+          this.openComment(habitId, idx);
+        }, 450);
+      },
+      up: () => clearTimeout(this.lpTimer),
+      cancel: () => clearTimeout(this.lpTimer),
+      ctx: (ev) => ev.preventDefault(),
+      click: () => {
+        if (this.lpFired) { this.lpFired = false; return; }
+        toggle();
+      },
+    };
+  }
+
+  isSameDate(a, b) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  }
+
+  buildMonthCells(year, month) {
+    const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < firstWeekday; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  }
+
+  buildRadar() {
+    const AREAS = this.AREAS, scores = this.state.scores;
+    const cx = 170, cy = 160, R = 110, N = AREAS.length;
+    const pt = (i, r) => {
+      const ang = (Math.PI * 2 * i) / N - Math.PI / 2;
+      return [cx + r * Math.cos(ang), cy + r * Math.sin(ang)];
+    };
+    const e = React.createElement;
+    const rings = [2, 4, 6, 8, 10].map((lvl) =>
+      e('polygon', {
+        key: 'ring' + lvl,
+        points: AREAS.map((_, i) => pt(i, (R * lvl) / 10).join(',')).join(' '),
+        fill: 'none', stroke: '#3C4043', strokeWidth: 1,
+      })
+    );
+    const spokes = AREAS.map((_, i) =>
+      e('line', { key: 'sp' + i, x1: cx, y1: cy, x2: pt(i, R)[0], y2: pt(i, R)[1], stroke: '#3C4043', strokeWidth: 1 })
+    );
+    const dataPts = AREAS.map((a, i) => pt(i, (R * (scores[a.id] || 1)) / 10));
+    const poly = e('polygon', {
+      points: dataPts.map((p) => p.join(',')).join(' '),
+      fill: 'rgba(138,180,248,0.25)', stroke: '#8AB4F8', strokeWidth: 2.5, strokeLinejoin: 'round',
+      style: { transition: 'all .3s ease' },
+    });
+    const dots = dataPts.map((p, i) =>
+      e('circle', { key: 'd' + i, cx: p[0], cy: p[1], r: 4.5, fill: AREAS[i].color, stroke: '#1E1F20', strokeWidth: 2 })
+    );
+    const labels = AREAS.map((a, i) => {
+      const [x, y] = pt(i, R + 26);
+      return e('text', {
+        key: 'l' + i, x, y: y + 4, textAnchor: 'middle',
+        fill: a.color, fontSize: 12, fontWeight: 500, fontFamily: "'Google Sans',sans-serif",
+      }, a.name);
+    });
+    return e('svg', { width: 340, height: 320, viewBox: '0 0 340 320', style: { maxWidth: '100%' } },
+      rings, spokes, poly, dots, labels);
+  }
+
+  freiVals() {
+    const s = this.state;
+    const F = this.global.frei || { log: {}, urges: [], diary: {}, dank: {} };
+    const setF = (patch) => this.saveGlobal({ frei: { ...F, ...patch } });
+    const isoOf = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const today = isoOf(new Date());
+    const dayMs = 86400000;
+    const tab = this.freiTab || 'tagebuch';
+    const selDate = this.freiSelDate || today;
+    const goTab = (id) => { this.freiTab = id; this.forceUpdate(); };
+    const log = F.log || {};
+    const urges = F.urges || [];
+
+    // Statistiken
+    const dates = Object.keys(log).sort();
+    const total = dates.length;
+    const cleanCount = dates.filter((d) => log[d] === 'clean').length;
+    const quote = total ? Math.round((cleanCount / total) * 100) + '%' : '—';
+    let run = 0;
+    for (let t = new Date(today).getTime(); ; t -= dayMs) {
+      const k = new Date(t).toISOString().slice(0, 10);
+      if (log[k] === 'clean') run++;
+      else if (log[k] === 'fall') break;
+      else if (k !== today) break;
+    }
+    let best = 0, cur = 0, prev = null;
+    for (const d of dates) {
+      if (log[d] === 'clean') {
+        cur = prev && (new Date(d).getTime() - new Date(prev).getTime() === dayMs) && log[prev] === 'clean' ? cur + 1 : 1;
+        if (cur > best) best = cur;
+      } else cur = 0;
+      prev = d;
+    }
+    if (run > best) best = run;
+
+    // Unter-Tabs
+    const subTabs = [
+      { id: 'tagebuch', label: '📓 Tagebuch' },
+      { id: 'urge', label: '⚡ Urge-Tracker' },
+      { id: 'generell', label: '🧭 Generell' },
+    ];
+    const freiTabsView = subTabs.map((t) => ({
+      label: t.label,
+      select: () => goTab(t.id),
+      style: {
+        background: tab === t.id ? '#8AB4F8' : '#28292C',
+        color: tab === t.id ? '#131314' : '#BDC1C6',
+        border: '1px solid ' + (tab === t.id ? '#8AB4F8' : '#3C4043'),
+        borderRadius: '100px', padding: '9px 18px', fontFamily: "'Google Sans',sans-serif",
+        fontSize: '13px', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
+      },
+    }));
+
+    // Kalender
+    const now = new Date();
+    const calY = this.freiCalYear ?? now.getFullYear();
+    const calM = this.freiCalMonth ?? now.getMonth();
+    const urgesByDate = {};
+    for (const u of urges) (urgesByDate[u.date] = urgesByDate[u.date] || []).push(u);
+    const todayD = new Date(); todayD.setHours(0, 0, 0, 0);
+    const cells = this.buildMonthCells(calY, calM).map((date, ci) => {
+      if (!date) return { key: 'e' + ci, empty: true, day: false };
+      const iso = isoOf(date);
+      const status = log[iso];
+      const isFuture = date.getTime() > todayD.getTime();
+      const isToday = this.isSameDate(date, todayD);
+      const isSel = iso === selDate;
+      return {
+        key: 'd' + ci, empty: false, day: true,
+        num: date.getDate(),
+        hasUrge: !!urgesByDate[iso],
+        title: date.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) + (status === 'clean' ? ' · clean' : status === 'fall' ? ' · Rückfall' : ''),
+        select: () => { if (!isFuture) { this.freiSelDate = iso; this.forceUpdate(); } },
+        style: {
+          position: 'relative', aspectRatio: '1', width: '100%', borderRadius: '8px',
+          cursor: isFuture ? 'default' : 'pointer', padding: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '12px', fontFamily: "'Google Sans Text','Roboto',sans-serif",
+          background: status === 'clean' ? '#81C995' : status === 'fall' ? '#FDD663' : (isFuture ? 'transparent' : '#28292C'),
+          color: status ? '#131314' : (isFuture ? '#4A4C4F' : '#9AA0A6'),
+          border: isSel ? '2px solid #8AB4F8' : (isToday ? '2px solid #5F6368' : '2px solid transparent'),
+          boxSizing: 'border-box', transition: 'background .15s ease',
+          touchAction: 'manipulation', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none',
+        },
+      };
+    });
+    const freiWeeks = [];
+    for (let w = 0; w < cells.length; w += 7) freiWeeks.push({ key: 'w' + w, cells: cells.slice(w, w + 7) });
+
+    // Ausgewählter Tag
+    const selD = new Date(selDate + 'T00:00:00');
+    const selVal = log[selDate];
+    const selUrges = urgesByDate[selDate] || [];
+    const ciBase = {
+      border: 'none', borderRadius: '100px', padding: '12px 22px', whiteSpace: 'nowrap',
+      fontFamily: "'Google Sans',sans-serif", fontSize: '14px', fontWeight: 500, cursor: 'pointer',
+    };
+
+    // Urge-Formular (Entwurf, transient)
+    const d = this.urgeDraft;
+    const setD = (patch) => { this.urgeDraft = { ...this.urgeDraft, ...patch }; this.forceUpdate(); };
+    const haltItems = [
+      { k: 'h', label: 'Hungry — hungrig?' },
+      { k: 'a', label: 'Angry — wütend?' },
+      { k: 'l', label: 'Lonely — einsam?' },
+      { k: 't', label: 'Tired — müde?' },
+    ];
+    const dHalt = (d && d.halt) || {};
+    const haltOn = haltItems.filter((x) => dHalt[x.k]);
+
+    // Urge-Verlauf
+    const fmtUrgeDay = (iso) => {
+      const dd = new Date(iso + 'T00:00:00');
+      const diff = Math.round((todayD - dd) / dayMs);
+      const str = dd.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      if (diff === 0) return 'Heute · ' + str;
+      if (diff === 1) return 'Gestern · ' + str;
+      return str;
+    };
+    const sorted = [...urges].sort((a, b) => (b.date + 'T' + (b.time || '')).localeCompare(a.date + 'T' + (a.time || '')) || (b.id - a.id));
+    const urgeDays = [];
+    for (const u of sorted) {
+      let grp = urgeDays.find((x) => x.date === u.date);
+      if (!grp) { grp = { date: u.date, label: fmtUrgeDay(u.date), items: [] }; urgeDays.push(grp); }
+      const parts = [];
+      if (u.situation) parts.push('Situation: ' + u.situation);
+      if (u.geraet) parts.push('Gerät: ' + u.geraet);
+      if (u.gefuehl) parts.push('Gefühl davor: ' + u.gefuehl);
+      if (u.hilfe) parts.push((u.outcome === 'gave' ? 'Hätte geholfen: ' : 'Geholfen: ') + u.hilfe);
+      const haltStr = ['h', 'a', 'l', 't'].filter((k) => (u.halt || {})[k]).map((k) => k.toUpperCase()).join('');
+      grp.items.push({
+        time: u.time || '—',
+        badge: u.outcome === 'gave' ? 'Nachgegeben' : '✓ Widerstanden',
+        badgeStyle: {
+          background: u.outcome === 'gave' ? '#3C2A1E' : '#0F3D2E',
+          color: u.outcome === 'gave' ? '#FDD663' : '#81C995',
+          borderRadius: '100px', padding: '4px 12px', fontSize: '12px', fontWeight: 500, whiteSpace: 'nowrap',
+        },
+        meta: [
+          u.intensity ? 'Intensität ' + u.intensity + '/10' : null,
+          haltStr ? 'HALT: ' + haltStr : null,
+          u.umgebung ? 'Umgebung ✓' : null,
+        ].filter(Boolean).join(' · '),
+        hasDetails: parts.length > 0,
+        details: parts.join(' · '),
+        edit: () => { this.urgeDraft = { ...u }; goTab('urge'); this.forceUpdate(); },
+        remove: () => setF({ urges: urges.filter((x) => x.id !== u.id) }),
+      });
+    }
+
+    return {
+      showFrei: s.tab === 'frei',
+      freiTabsView,
+      freiShowTagebuch: tab === 'tagebuch',
+      freiShowUrge: tab === 'urge',
+      freiShowGenerell: tab === 'generell',
+      freiQuote: quote, freiRun: run, freiBest: best, freiTotal: total,
+      freiCalLabel: new Date(calY, calM, 1).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }),
+      freiCalPrev: () => { const m = calM - 1; this.freiCalMonth = (m + 12) % 12; this.freiCalYear = m < 0 ? calY - 1 : calY; this.forceUpdate(); },
+      freiCalNext: () => { const m = calM + 1; this.freiCalMonth = m % 12; this.freiCalYear = m > 11 ? calY + 1 : calY; this.forceUpdate(); },
+      freiWeeks,
+      calWeekdays: ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'],
+      freiSelLabel: selD.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + (selDate === today ? ' · Heute' : ''),
+      freiSelNotToday: selDate !== today,
+      freiGoToday: () => { this.freiSelDate = today; this.freiCalYear = now.getFullYear(); this.freiCalMonth = now.getMonth(); this.forceUpdate(); },
+      freiMarkClean: () => setF({ log: { ...log, [selDate]: selVal === 'clean' ? undefined : 'clean' } }),
+      freiMarkFall: () => setF({ log: { ...log, [selDate]: selVal === 'fall' ? undefined : 'fall' } }),
+      freiCleanStyle: { ...ciBase, background: selVal === 'clean' ? '#81C995' : '#28292C', color: selVal === 'clean' ? '#131314' : '#81C995', border: '1px solid #81C995' },
+      freiFallStyle: { ...ciBase, background: selVal === 'fall' ? '#FDD663' : '#28292C', color: selVal === 'fall' ? '#131314' : '#BDC1C6', border: '1px solid #3C4043' },
+      freiSelFall: selVal === 'fall',
+      freiGoUrge: () => goTab('urge'),
+      freiDank: (F.dank || {})[selDate] || '',
+      freiSetDank: (ev) => setF({ dank: { ...(F.dank || {}), [selDate]: ev.target.value } }),
+      freiDiary: (F.diary || {})[selDate] || '',
+      freiSetDiary: (ev) => setF({ diary: { ...(F.diary || {}), [selDate]: ev.target.value } }),
+      freiSelHasUrges: selUrges.length > 0,
+      freiSelUrgeCount: selUrges.length,
+
+      // Urge-Tracker
+      urgeFormOpen: !!d,
+      urgeFormClosed: !d,
+      urgeFormTitle: d && urges.some((x) => x.id === d.id) ? 'Urge bearbeiten' : 'Urge protokollieren',
+      urgeOpen: () => {
+        const n = new Date();
+        this.urgeDraft = {
+          outcome: 'res', intensity: 5, halt: {}, umgebung: false,
+          time: String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0'),
+          situation: '', geraet: '', gefuehl: '', hilfe: '',
+        };
+        this.forceUpdate();
+      },
+      urgeCancel: () => { this.urgeDraft = null; this.forceUpdate(); },
+      urgeSetRes: () => setD({ outcome: 'res' }),
+      urgeSetGave: () => setD({ outcome: 'gave' }),
+      urgeIsRes: !!d && d.outcome === 'res',
+      urgeIsGave: !!d && d.outcome === 'gave',
+      urgeResStyle: { ...ciBase, background: d && d.outcome === 'res' ? '#81C995' : '#28292C', color: d && d.outcome === 'res' ? '#131314' : '#81C995', border: '1px solid #81C995' },
+      urgeGaveStyle: { ...ciBase, background: d && d.outcome === 'gave' ? '#FDD663' : '#28292C', color: d && d.outcome === 'gave' ? '#131314' : '#BDC1C6', border: '1px solid #3C4043' },
+      urgeTime: d ? d.time : '',
+      urgeSetTime: (ev) => setD({ time: ev.target.value }),
+      urgeIntensity: d ? d.intensity : 5,
+      urgeSetIntensity: (ev) => setD({ intensity: Number(ev.target.value) }),
+      urgeHalt: haltItems.map((x) => ({
+        label: (dHalt[x.k] ? '✓ ' : '') + x.label,
+        toggle: () => setD({ halt: { ...dHalt, [x.k]: !dHalt[x.k] } }),
+        style: {
+          background: dHalt[x.k] ? '#8AB4F8' : '#28292C', color: dHalt[x.k] ? '#131314' : '#BDC1C6',
+          border: '1px solid ' + (dHalt[x.k] ? '#8AB4F8' : '#3C4043'), borderRadius: '100px',
+          padding: '9px 16px', fontSize: '13px', fontFamily: "'Google Sans',sans-serif", fontWeight: 500,
+          cursor: 'pointer', whiteSpace: 'nowrap',
+        },
+      })),
+      urgeHaltHint: haltOn.length
+        ? 'Der Drang ist oft nur ein verkleidetes Grundbedürfnis. Kümmere dich zuerst darum: ' + haltOn.map((x) => x.label.split(' — ')[0]).join(', ') + '.'
+        : 'Alle vier verneint? Dann ist es die Suchtstimme — 3-Sekunden-Regel anwenden und Sofort-Aktion wählen.',
+      urgeHaltHintColor: haltOn.length ? '#FDD663' : '#9AA0A6',
+      urgeUmgebung: !!(d && d.umgebung),
+      urgeToggleUmgebung: (ev) => setD({ umgebung: ev.target.checked }),
+      urgeSituation: d ? d.situation : '', urgeSetSituation: (ev) => setD({ situation: ev.target.value }),
+      urgeGeraet: d ? d.geraet : '', urgeSetGeraet: (ev) => setD({ geraet: ev.target.value }),
+      urgeGefuehl: d ? d.gefuehl : '', urgeSetGefuehl: (ev) => setD({ gefuehl: ev.target.value }),
+      urgeHilfe: d ? d.hilfe : '', urgeSetHilfe: (ev) => setD({ hilfe: ev.target.value }),
+      urgeSave: () => {
+        if (!d) return;
+        const isEdit = urges.some((x) => x.id === d.id);
+        const entryDate = isEdit ? d.date : today;
+        const patch = isEdit
+          ? { urges: urges.map((x) => (x.id === d.id ? { ...d, date: entryDate } : x)) }
+          : { urges: [...urges, { id: Date.now(), date: today, ...d }] };
+        if (d.outcome === 'gave') patch.log = { ...log, [entryDate]: 'fall' };
+        this.urgeDraft = null;
+        setF(patch);
+      },
+      urgesEmpty: urgeDays.length === 0,
+      urgeDays,
+
+      // Generell
+      freiInner: F.inner || '', freiSetInner: (ev) => setF({ inner: ev.target.value }),
+      freiMiddle: F.middle || '', freiSetMiddle: (ev) => setF({ middle: ev.target.value }),
+      freiOuter: F.outer || '', freiSetOuter: (ev) => setF({ outer: ev.target.value }),
+      freiBookend: F.bookend || '', freiSetBookend: (ev) => setF({ bookend: ev.target.value }),
+      freiKosten: F.kosten || '', freiSetKosten: (ev) => setF({ kosten: ev.target.value }),
+      freiGewinn: F.gewinn || '', freiSetGewinn: (ev) => setF({ gewinn: ev.target.value }),
+      freiBeast: F.beast || '', freiSetBeast: (ev) => setF({ beast: ev.target.value }),
+    };
+  }
+
+  commentVals() {
+    const t = this.commentTarget;
+    if (!t) return { commentOpen: false };
+    const h = this.global.habits.find((x) => x.id === t.habitId);
+    if (!h) return { commentOpen: false };
+    const date = this.dateFromStart(h.startDate || this.daysAgoISO(0), t.idx);
+    const hasExisting = !!((h.comments || {})[t.idx]);
+    const close = () => { this.commentTarget = null; this.commentDraft = ''; this.forceUpdate(); };
+    const save = (text) => {
+      const comments = { ...(h.comments || {}) };
+      if (text && text.trim()) comments[t.idx] = text.trim(); else delete comments[t.idx];
+      this.saveGlobal({ habits: this.global.habits.map((x) => (x.id === h.id ? { ...x, comments } : x)) });
+      close();
+    };
+    return {
+      commentOpen: true,
+      commentTitle: h.name,
+      commentSub: date.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) + ' · Tag ' + (t.idx + 1),
+      commentText: this.commentDraft || '',
+      setCommentText: (ev) => { this.commentDraft = ev.target.value; this.forceUpdate(); },
+      saveComment: () => save(this.commentDraft),
+      deleteComment: () => save(''),
+      closeComment: close,
+      commentHasExisting: hasExisting,
+    };
+  }
+
+  renderVals() {
+    const s = this.state, AREAS = this.AREAS;
+    const maxFokus = this.props.maxFokus ?? 2;
+    const jahr = s.year ?? (this.props.jahr ?? 2026);
+    const scores = s.scores;
+    const avg = AREAS.reduce((sum, a) => sum + (scores[a.id] || 1), 0) / AREAS.length;
+    const weakest = AREAS.reduce((w, a) => (scores[a.id] < scores[w.id] ? a : w), AREAS[0]);
+
+    const tabs = [
+      { id: 'dashboard', label: 'Dashboard' },
+      { id: 'fokus', label: 'Fokus & Ziele' },
+      { id: 'habits', label: 'Habit Tracker' },
+      { id: 'frei', label: 'Freiheit' },
+    ];
+    const tabsView = tabs.map((t) => ({
+      label: t.label,
+      select: () => this.set({ tab: t.id }),
+      style: {
+        background: s.tab === t.id ? '#004A77' : 'transparent',
+        color: s.tab === t.id ? '#C2E7FF' : '#BDC1C6',
+        border: 'none', borderRadius: '100px', padding: '10px 18px',
+        fontFamily: "'Google Sans',sans-serif", fontSize: '14px', fontWeight: 500, cursor: 'pointer',
+      },
+    }));
+
+    const areasView = AREAS.map((a) => ({
+      ...a,
+      score: scores[a.id] || 1,
+      vision: s.visions[a.id] || '',
+      isFocus: s.focus.includes(a.id),
+      setScore: (ev) => this.set({ scores: { ...s.scores, [a.id]: Number(ev.target.value) } }),
+      setVision: (ev) => this.set({ visions: { ...s.visions, [a.id]: ev.target.value } }),
+    }));
+
+    const focusChips = AREAS.map((a) => {
+      const on = s.focus.includes(a.id);
+      const full = !on && s.focus.length >= maxFokus;
+      return {
+        label: (on ? '✓ ' : '') + a.name,
+        toggle: () => {
+          if (on) this.set({ focus: s.focus.filter((f) => f !== a.id) });
+          else if (!full) this.set({ focus: [...s.focus, a.id] });
+        },
+        style: {
+          background: on ? a.color : '#28292C',
+          color: on ? '#131314' : full ? '#5F6368' : '#E3E3E3',
+          border: '1px solid ' + (on ? a.color : '#3C4043'),
+          borderRadius: '100px', padding: '10px 18px', whiteSpace: 'nowrap', flexShrink: 0,
+          fontFamily: "'Google Sans',sans-serif", fontSize: '14px', fontWeight: 500,
+          cursor: full ? 'not-allowed' : 'pointer', opacity: full ? 0.5 : 1,
+        },
+      };
+    });
+
+    const goalStatus = s.goalStatus || {};
+    const reflexions = s.reflexions || {};
+    const btnBase = {
+      border: '1px solid #3C4043', borderRadius: '100px', padding: '8px 16px',
+      fontFamily: "'Google Sans',sans-serif", fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+    };
+
+    const focusAreasView = AREAS.filter((a) => s.focus.includes(a.id)).map((a) => {
+      const st = goalStatus[a.id] || null;
+      return {
+        name: a.name, color: a.color,
+        goals: s.goals[a.id] || '',
+        goalPlaceholder: a.goalPlaceholder,
+        setGoals: (ev) => this.set({ goals: { ...s.goals, [a.id]: ev.target.value } }),
+        reflexion: reflexions[a.id] || '',
+        setReflexion: (ev) => this.set({ reflexions: { ...reflexions, [a.id]: ev.target.value } }),
+        startScore: s.scores[a.id] ?? 5,
+        endScore: (s.endScores || {})[a.id] ?? s.scores[a.id] ?? 5,
+        setEndScore: (ev) => this.set({ endScores: { ...(s.endScores || {}), [a.id]: Number(ev.target.value) } }),
+      };
+    });
+
+    const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const G = this.global;
+    const calYear = G.calYear ?? today.getFullYear();
+    const calMonth = G.calMonth ?? today.getMonth();
+
+    const habitsView = G.habits.map((h) => {
+      const doneCount = h.days.filter(Boolean).length;
+      const startDate = h.startDate || this.daysAgoISO(0);
+      const toggleIndex = (i) => {
+        const habits = G.habits.map((x) =>
+          x.id === h.id ? { ...x, days: x.days.map((v, j) => (j === i ? !v : v)) } : x
+        );
+        this.saveGlobal({ habits });
+      };
+      const monthCells = this.buildMonthCells(calYear, calMonth).map((date, ci) => {
+        if (!date) return { key: 'e' + ci, empty: true };
+        const idx = Math.round((date - new Date(startDate + 'T00:00:00')) / 86400000);
+        const inRange = idx >= 0 && idx < h.days.length;
+        const done = inRange && h.days[idx];
+        const isToday = this.isSameDate(date, today);
+        const hasComment = inRange && !!((h.comments || {})[idx]);
+        const ph = inRange ? this.pressHandlers(h.id, idx, () => toggleIndex(idx)) : {};
+        return {
+          key: 'd' + ci,
+          empty: false,
+          num: date.getDate(),
+          inRange,
+          outOfRange: !inRange,
+          toggle: ph.click,
+          down: ph.down, up: ph.up, cancel: ph.cancel, ctx: ph.ctx,
+          hasComment,
+          style: {
+            position: 'relative',
+            aspectRatio: '1', width: '100%', borderRadius: '8px', cursor: inRange ? 'pointer' : 'default',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '12px', fontFamily: "'Google Sans Text','Roboto',sans-serif",
+            background: done ? '#81C995' : (inRange ? '#28292C' : 'transparent'),
+            color: done ? '#131314' : (inRange ? '#9AA0A6' : '#4A4C4F'),
+            border: isToday ? '2px solid #8AB4F8' : '2px solid transparent',
+            boxSizing: 'border-box', transition: 'background .15s ease',
+            touchAction: 'manipulation', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none',
+          },
+        };
+      });
+      const weeks = [];
+      for (let w = 0; w < monthCells.length; w += 7) weeks.push({ key: 'w' + w, cells: monthCells.slice(w, w + 7) });
+
+      return {
+        ...h,
+        kurz: h.kurz || '—', mittel: h.mittel || '—', lang: h.lang || '—',
+        hasWhy: !!(h.kurz || h.mittel || h.lang),
+        disziplin: doneCount >= 10 && doneCount < 40,
+        doneCount,
+        pct: Math.round((doneCount / 66) * 100) + '%',
+        done: doneCount >= 66,
+        remove: () => this.saveGlobal({ habits: G.habits.filter((x) => x.id !== h.id) }),
+        monthWeeks: weeks,
+        days: h.days.map((d, i) => {
+          const date = this.dateFromStart(startDate, i);
+          const isToday = this.isSameDate(date, today);
+          const hasComment = !!((h.comments || {})[i]);
+          const ph = this.pressHandlers(h.id, i, () => toggleIndex(i));
+          return {
+            title: WEEKDAYS[(date.getDay() + 6) % 7] + ', ' + date.toLocaleDateString('de-DE') + ' — Tag ' + (i + 1) + (hasComment ? ' · 💬 ' + (h.comments || {})[i] : ''),
+            wd: WEEKDAYS[(date.getDay() + 6) % 7][0],
+            toggle: ph.click,
+            down: ph.down, up: ph.up, cancel: ph.cancel, ctx: ph.ctx,
+            hasComment,
+            style: {
+              position: 'relative',
+              aspectRatio: '1', width: '100%', border: isToday ? '2px solid #8AB4F8' : '2px solid transparent',
+              borderRadius: '4px', boxSizing: 'border-box',
+              background: d ? '#81C995' : '#28292C', cursor: 'pointer', padding: 0,
+              color: d ? '#131314' : '#6C6F73', fontSize: '9px', fontWeight: '500',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
+              transition: 'background .15s ease',
+              touchAction: 'manipulation', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none',
+            },
+          };
+        }),
+      };
+    });
+
+    return {
+      jahr, maxFokus,
+      showYearPicker: s.tab !== 'habits' && s.tab !== 'frei',
+      yearPrev: () => this.switchYear(-1),
+      yearNext: () => this.switchYear(1),
+      ...this.logVals(),
+      tabsView,
+      showDashboard: s.tab === 'dashboard',
+      showFokus: s.tab === 'fokus',
+      showHabits: s.tab === 'habits',
+      radarChart: this.buildRadar(),
+      avgScore: avg.toFixed(1).replace('.', ','),
+      weakestName: weakest.name,
+      weakestScore: scores[weakest.id],
+      weakestColor: weakest.color,
+      goToFokus: () => this.set({ tab: 'fokus' }),
+      areasView,
+      focusChips,
+      focusAreasView,
+      noFocus: s.focus.length === 0,
+      focusHint: s.focus.length >= maxFokus
+        ? 'Limit erreicht — mehr Fokus geht nicht. Genau richtig so.'
+        : (s.focus.length + ' von ' + maxFokus + ' Fokus-Bereichen gewählt.'),
+      focusHintColor: s.focus.length >= maxFokus ? '#81C995' : '#9AA0A6',
+      habitsView,
+      isStreakView: (G.habitViewMode || 'streak') === 'streak',
+      isMonthView: G.habitViewMode === 'month',
+      setStreakView: () => this.saveGlobal({ habitViewMode: 'streak' }),
+      setMonthView: () => this.saveGlobal({ habitViewMode: 'month' }),
+      streakBtnStyle: {
+        background: (G.habitViewMode || 'streak') === 'streak' ? '#8AB4F8' : 'transparent',
+        color: (G.habitViewMode || 'streak') === 'streak' ? '#131314' : '#9AA0A6',
+        border: '1px solid ' + ((G.habitViewMode || 'streak') === 'streak' ? '#8AB4F8' : '#3C4043'),
+        borderRadius: '100px', padding: '8px 18px', fontFamily: "'Google Sans',sans-serif", fontSize: '13px', fontWeight: '500', cursor: 'pointer',
+      },
+      monthBtnStyle: {
+        background: G.habitViewMode === 'month' ? '#8AB4F8' : 'transparent',
+        color: G.habitViewMode === 'month' ? '#131314' : '#9AA0A6',
+        border: '1px solid ' + (G.habitViewMode === 'month' ? '#8AB4F8' : '#3C4043'),
+        borderRadius: '100px', padding: '8px 18px', fontFamily: "'Google Sans',sans-serif", fontSize: '13px', fontWeight: '500', cursor: 'pointer',
+      },
+      calLabel: new Date(calYear, calMonth, 1).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }),
+      calPrev: () => {
+        const m = calMonth - 1, y = m < 0 ? calYear - 1 : calYear;
+        this.saveGlobal({ calMonth: (m + 12) % 12, calYear: y });
+      },
+      calNext: () => {
+        const m = calMonth + 1, y = m > 11 ? calYear + 1 : calYear;
+        this.saveGlobal({ calMonth: m % 12, calYear: y });
+      },
+      calWeekdays: WEEKDAYS,
+      newHabitName: G.newHabitName, setNewHabitName: (ev) => this.saveGlobal({ newHabitName: ev.target.value }),
+      newHabitWenn: G.newHabitWenn, setNewHabitWenn: (ev) => this.saveGlobal({ newHabitWenn: ev.target.value }),
+      newHabitDann: G.newHabitDann, setNewHabitDann: (ev) => this.saveGlobal({ newHabitDann: ev.target.value }),
+      addHabit: () => {
+        if (!G.newHabitName.trim()) return;
+        const active = G.habits.filter((h) => h.days.filter(Boolean).length < 66).length;
+        if (active >= 3) { this.saveGlobal({ overloadWarn: true }); return; }
+        this.saveGlobal({
+          habits: [...G.habits, {
+            id: Date.now(),
+            startDate: this.daysAgoISO(0),
+            name: G.newHabitName.trim(),
+            wenn: G.newHabitWenn.trim() || '…',
+            dann: G.newHabitDann.trim() || '…',
+            kurz: (G.newHabitKurz || '').trim(),
+            mittel: (G.newHabitMittel || '').trim(),
+            lang: (G.newHabitLang || '').trim(),
+            days: Array(66).fill(false),
+          }],
+          newHabitName: '', newHabitWenn: '', newHabitDann: '',
+          newHabitKurz: '', newHabitMittel: '', newHabitLang: '',
+          overloadWarn: false,
+        });
+      },
+      overloadWarn: !!G.overloadWarn,
+      newHabitKurz: G.newHabitKurz || '', setNewHabitKurz: (ev) => this.saveGlobal({ newHabitKurz: ev.target.value }),
+      newHabitMittel: G.newHabitMittel || '', setNewHabitMittel: (ev) => this.saveGlobal({ newHabitMittel: ev.target.value }),
+      newHabitLang: G.newHabitLang || '', setNewHabitLang: (ev) => this.saveGlobal({ newHabitLang: ev.target.value }),
+      ...this.commentVals(),
+      ...this.freiVals(),
+    };
+  }
+}
+</script>
+</body>
+</html>
