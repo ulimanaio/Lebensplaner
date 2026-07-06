@@ -624,15 +624,14 @@ function renderHeute() {
       ),
   );
 
-  // 4) Challenge der Woche — ISO-Woche, auf 1..52 gemappt wie im Challenges-Tab
-  const weekNr = ((isoWeek(now) - 1) % 52) + 1;
-  const weekCh = CHALLENGES.find((c) => c.id === weekNr);
+  // 4) Aktuelle Challenge — die nächste offene in Reihenfolge (kein KW-Bezug)
+  const weekCh = CHALLENGES.find((c) => c.id === currentChallengeId(g));
   const chState = weekCh && ((g.challenges || {})[weekCh.id] || { done: false });
   const challengeCard = weekCh && el('button', {
     class: 'card p24 heute-challenge' + (chState.done ? ' done' : ''),
     onClick: () => selectTab('challenges'),
   },
-    el('div', { class: 'heute-challenge-label' }, 'CHALLENGE DER WOCHE · KW ' + weekNr),
+    el('div', { class: 'heute-challenge-label' }, 'AKTUELLE CHALLENGE'),
     el('div', { class: 'heute-challenge-title' }, weekCh.title),
     el('div', { class: 'heute-challenge-status' },
       chState.done ? '✓ Erledigt' : 'Noch offen — antippen zum Öffnen'),
@@ -1488,12 +1487,12 @@ function renderFrei() {
   );
 }
 
-// ---------- Mini-Challenges (Martin Wehrle, 52 Wochen-Impulse) ----------
-function isoWeek(d) {
-  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
-  return Math.ceil(((t - yearStart) / 86400000 + 1) / 7);
+// ---------- Mini-Challenges (Martin Wehrle, 52 Impulse) ----------
+// Aktuelle Challenge = erste noch nicht erledigte in Reihenfolge (kein Kalenderwochen-Bezug).
+function currentChallengeId(g) {
+  const all = (g && g.challenges) || {};
+  const next = CHALLENGES.find((c) => !(all[c.id] && all[c.id].done));
+  return next ? next.id : CHALLENGES[CHALLENGES.length - 1].id;
 }
 
 function setChallenge(id, patch) {
@@ -1506,7 +1505,7 @@ function renderChallenges() {
   const g = state.global;
   const all = g.challenges || {};
   const doneCount = CHALLENGES.filter((c) => all[c.id] && all[c.id].done).length;
-  const weekNr = ((isoWeek(new Date()) - 1) % 52) + 1;
+  const currentId = currentChallengeId(g);
   const filter = g.challengeFilter || 'alle';
 
   const filtered = CHALLENGES.filter((c) => {
@@ -1517,14 +1516,14 @@ function renderChallenges() {
   function card(c) {
     const st = all[c.id] || { done: false, doneAt: null, note: '' };
     const open = g.challengeOpen === c.id;
-    const isWeek = c.id === weekNr;
+    const isWeek = c.id === currentId;
 
     const head = el('button', {
       class: 'ch-head', onClick: () => { setGlobal({ challengeOpen: open ? null : c.id }); render(); },
     },
       el('span', { class: 'ch-nr' + (st.done ? ' done' : '') }, st.done ? '✓' : String(c.id)),
       el('span', { class: 'ch-head-text' },
-        el('span', { class: 'ch-title' }, c.title, isWeek && el('span', { class: 'ch-week-badge' }, 'Diese Woche')),
+        el('span', { class: 'ch-title' }, c.title, isWeek && el('span', { class: 'ch-week-badge' }, 'Aktuell')),
         el('span', { class: 'ch-sub' }, c.subtitle),
       ),
       el('span', { class: 'ch-chevron' + (open ? ' open' : '') }, '›'),
@@ -1560,7 +1559,7 @@ function renderChallenges() {
   }
 
   function heroCard() {
-    const c = CHALLENGES.find((x) => x.id === weekNr);
+    const c = CHALLENGES.find((x) => x.id === currentId);
     if (!c) return null;
     const st = all[c.id] || { done: false, doneAt: null, note: '' };
     const toggle = () => {
@@ -1571,13 +1570,13 @@ function renderChallenges() {
     };
 
     return el('div', { class: 'ch-hero' + (st.done ? ' done' : '') },
-      el('span', { class: 'ch-hero-label' }, 'CHALLENGE DER WOCHE · KW ' + weekNr),
+      el('span', { class: 'ch-hero-label' }, 'AKTUELLE CHALLENGE'),
       el('span', { class: 'ch-hero-title' }, c.title),
       el('p', { class: 'ch-hero-text' }, c.text[0] || ''),
       el('div', { class: 'ch-hero-actions' },
         st.done
           ? [
-              el('span', { class: 'ch-hero-done' }, '✓ Diese Woche geschafft'),
+              el('span', { class: 'ch-hero-done' }, '✓ Geschafft'),
               el('button', { class: 'btn-ghost', onClick: toggle }, 'Rückgängig'),
             ]
           : el('button', { class: 'btn-primary', onClick: toggle }, 'Erledigt ✓'),
@@ -1594,7 +1593,7 @@ function renderChallenges() {
 
   return el('div', { class: 'screen', 'data-screen-label': 'Mini-Challenges' },
     el('h2', { class: 'section-h2', style: 'margin-top:0;' }, 'Mini-Challenges'),
-    el('div', { class: 'frei-intro' }, '52 Wochen-Impulse aus »Dieses Buch verändert dein Leben für immer« (Martin Wehrle). Eine Challenge pro Woche reicht — klein anfangen, groß wirken.'),
+    el('div', { class: 'frei-intro' }, '52 Impulse aus »Dieses Buch verändert dein Leben für immer« (Martin Wehrle). Eine nach der anderen im eigenen Tempo — klein anfangen, groß wirken.'),
     heroCard(),
     el('div', { class: 'ch-progress' },
       el('div', { class: 'ch-progress-bar' }, el('div', { class: 'ch-progress-fill', style: 'width:' + Math.round((doneCount / CHALLENGES.length) * 100) + '%;' })),
