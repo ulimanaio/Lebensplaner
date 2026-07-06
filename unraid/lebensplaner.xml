@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Lebensplaner</Name>
+  <Repository>ghcr.io/ulimanaio/lebensplaner:latest</Repository>
+  <Registry>https://github.com/ulimanaio/Lebensplaner/pkgs/container/lebensplaner</Registry>
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Support/>
+  <Project>https://github.com/ulimanaio/Lebensplaner</Project>
+  <Overview>Persoenliche Single-User-App zur Lebensplanung (6-Saeulen-System, Habit-Tracker, Freiheit &amp; Kontrolle). Single-Container, verschluesselte SQLite. Bedienung primaer am Handy (PWA).</Overview>
+  <Category>Productivity:</Category>
+  <WebUI>http://[IP]:[PORT:8484]</WebUI>
+  <Icon>https://raw.githubusercontent.com/ulimanaio/Lebensplaner/main/frontend/icon.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <Description>Persoenliche Lebensplanungs-App. Daten liegen verschluesselt in SQLite unter /data. DB_PASSPHRASE ist PFLICHT und muss sicher aufbewahrt werden — ohne sie ist die Datenbank unlesbar.</Description>
+
+  <Config Name="WebUI Port" Target="8484" Default="8484" Mode="tcp" Description="Port der Web-Oberflaeche" Type="Port" Display="always" Required="true" Mask="false">8484</Config>
+
+  <Config Name="Daten (/data)" Target="/data" Default="/mnt/user/appdata/lebensplaner" Mode="rw" Description="Verschluesselte SQLite-Datenbank. Backup dieses Ordners = Backup aller Daten." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/lebensplaner</Config>
+
+  <Config Name="DB_PASSPHRASE" Target="DB_PASSPHRASE" Default="" Mode="" Description="PFLICHT: langes, eigenes Passwort. Verschluesselt die Datenbank. SICHER AUFBEWAHREN — Verlust = Datenverlust." Type="Variable" Display="always" Required="true" Mask="true"/>
+
+  <Config Name="APP_PIN" Target="APP_PIN" Default="" Mode="" Description="Optional: 4-6-stellige PIN als simpler Zugriffsschutz im LAN. Leer lassen = kein PIN." Type="Variable" Display="always" Required="false" Mask="false"/>
+</Container>
