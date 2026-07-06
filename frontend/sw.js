@@ -1,6 +1,6 @@
 // App-Shell-Cache: App lädt sofort, Daten kommen frisch vom Server.
-const CACHE = 'lebensplaner-v3';
-const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/css/app.css', '/js/app.js', '/js/api.js', '/js/challenges-data.js'];
+const CACHE = 'lebensplaner-v5';
+const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/css/app.css', '/css/fonts.css', '/js/app.js', '/js/api.js', '/js/challenges-data.js', '/icons/icon-192.svg', '/icons/icon-512.svg', '/fonts/inter-400.woff2', '/fonts/inter-500.woff2', '/fonts/inter-700.woff2'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));

@@ -66,9 +66,10 @@ history_entry_removed, history_cleared, import, challenge_toggled, challenge_not
 |---|---|
 | DOM-Helfer | `el()`, `svg()` (Anfang der Datei) |
 | Daten laden/speichern | `loadYearDoc`, `setDoc`, `setGlobal`, `setFrei`, `recordLog` |
+| Heute (Standard-Tab, Tages-Cockpit) | `renderHeute` — aggregiert Habits/Frei/Challenge/Dankbarkeit über bestehende Daten, keine eigenen Keys/Events |
 | Dashboard (Radar, Scores) | `renderDashboard`, `buildRadar`, `updateScoreVisuals` |
 | Fokus & Ziele | `renderFokus` |
-| Freiheit & Kontrolle | `renderFrei` + `renderFreiTagebuch` / `renderFreiUrge` / `renderFreiGenerell` |
+| Freiheit & Kontrolle | `renderFrei` + `renderFreiTagebuch` / `renderFreiUrge` / `renderFreiGenerell` (enthält `renderFreiStats`: Heatmap/Sieg-Quote/Muster, rein lesend, speichert nichts) |
 | Habit Tracker | `renderHabits`, `pressHandlers` (Long-Press), `renderCommentSheet` |
 | Mini-Challenges | `renderChallenges`, `setChallenge`, `isoWeek`; statische Daten in `frontend/js/challenges-data.js` (52 Einträge aus Wehrle-Buch, `Sources/`) |
 | Verlauf-Drawer | `renderOverlay`, `openLog` |

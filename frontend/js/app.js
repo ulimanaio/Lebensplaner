@@ -1,8 +1,8 @@
 // Lebensplaner-Frontend — Vanilla DOM, kein Build-Schritt.
 // Nachbau von design_reference/Lebensplaner.dc.html, Daten via /api statt localStorage.
-import { getDoc, saveDoc, flushAll, sendEvent, setSaveListener } from './api.js';
+import { getDoc, saveDoc, flushAll, sendEvent, setSaveListener, setPendingListener, pendingSaves } from './api.js';
 import { CHALLENGES } from './challenges-data.js';
-import { mdField } from './markdown.js';
+import { mdField, mdToHtml } from './markdown.js';
 
 const AREAS = [
   { id: 'koerper', name: 'Körper & Geist', color: '#8AB4F8', placeholder: 'Ich fühle mich unbesiegbar. Nichts kann mir etwas anhaben, ich durchstehe jede Krise und jedes körperliche Gebrechen (Terminator-Modus).', goalPlaceholder: 'z. B. Zweimal die Woche Laufen, zweimal die Woche Fitnessstudio, einen Halbmarathon laufen, einen HYROX-Wettkampf absolvieren.' },
@@ -16,6 +16,7 @@ const AREAS = [
 const MAX_FOKUS = 2;
 
 const TABS = [
+  { id: 'heute', label: 'Heute' },
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'fokus', label: 'Fokus & Ziele' },
   { id: 'habits', label: 'Habit Tracker' },
@@ -24,12 +25,22 @@ const TABS = [
 ];
 
 // Icon + Kurz-Label je Tab für die mobile Bottom-Nav (Reihenfolge wie TABS).
+// Icons als Inline-SVG (Material-Symbols-Stil, 24x24, currentColor) — keine Icon-Fonts/CDNs.
+const NAV_ICONS = {
+  heute: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="8.5"/></svg>',
+  dashboard: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="16" y="3" width="4" height="17" rx="1"/></svg>',
+  fokus: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>',
+  habits: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.3l2.3 2.3 4.7-4.9"/></svg>',
+  frei: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15c3-6 8-9 13-9 2 0 4 1 5 2-3 1-4 3-4 5 0 3-3 6-7 6-2.5 0-4.5-1-6-2.5"/><path d="M3 15c1.5.5 3 .5 4.5 0"/></svg>',
+  challenges: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v6a6 6 0 0 1-12 0V3z"/><path d="M6 5H3a3 3 0 0 0 3 5"/><path d="M18 5h3a3 3 0 0 1-3 5"/><path d="M12 15v4"/><path d="M8 21h8"/></svg>',
+};
 const BOTTOM_NAV = {
-  dashboard: { icon: '📊', label: 'Dashboard' },
-  fokus: { icon: '🎯', label: 'Fokus' },
-  habits: { icon: '✅', label: 'Habits' },
-  frei: { icon: '🕊️', label: 'Freiheit' },
-  challenges: { icon: '🏆', label: 'Challenges' },
+  heute: { icon: NAV_ICONS.heute, label: 'Heute' },
+  dashboard: { icon: NAV_ICONS.dashboard, label: 'Dashboard' },
+  fokus: { icon: NAV_ICONS.fokus, label: 'Fokus' },
+  habits: { icon: NAV_ICONS.habits, label: 'Habits' },
+  frei: { icon: NAV_ICONS.frei, label: 'Freiheit' },
+  challenges: { icon: NAV_ICONS.challenges, label: 'Challenges' },
 };
 
 const JAHR_DEFAULT = 2026;
@@ -38,7 +49,7 @@ const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
 const state = {
   year: JAHR_DEFAULT,
-  tab: 'dashboard',
+  tab: 'heute',
   doc: null,      // Dokument 'year-<jahr>'
   uilog: [],      // Dokument 'uilog' (Anzeige-Verlauf, max. 400)
   global: null,   // Dokument 'global' (Habit Tracker, jahresübergreifend)
@@ -48,6 +59,8 @@ const state = {
   saveError: false,
   commentTarget: null, // { habitId, idx, draft }
   urgeDraft: null,     // transientes Urge-Formular, nicht persistiert
+  urgeCelebration: null, // transient: Sieg-Overlay nach „Widerstanden", { n } — reines UI
+  urgeGaveNote: false,   // transient: freundliche Karte nach „Nachgegeben" — reines UI
 };
 const yearCache = new Map(); // jahr -> doc (vermeidet Races mit debounced Saves)
 const refs = {};             // DOM-Referenzen für gezielte Updates (Slider-Live-Feedback)
@@ -72,11 +85,38 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
+// Range-Slider mit gefülltem Track (--fill) für Webkit. min/max fest 1–10.
+// Setzt --fill initial und live bei jeder Bewegung; onInput/onChange werden durchgereicht.
+function rangeSlider({ value, min = 1, max = 10, onInput, onChange }) {
+  const setFill = (node) => {
+    const pct = ((Number(node.value) - min) / (max - min)) * 100;
+    node.style.setProperty('--fill', pct + '%');
+  };
+  const input = el('input', {
+    type: 'range', min: String(min), max: String(max), step: '1', value: String(value),
+    onInput: (ev) => { setFill(ev.target); if (onInput) onInput(ev); },
+    onChange: (ev) => { setFill(ev.target); if (onChange) onChange(ev); },
+  });
+  setFill(input);
+  return input;
+}
+
 // Klappbare Info-Box: auf Mobile zugeklappt, auf Desktop (>720px) initial offen.
 function collapsibleInfo(title, ...content) {
   return el('details', { class: 'info-collapse', open: window.innerWidth > 720 ? '' : null },
     el('summary', { class: 'info-collapse-summary' }, title),
     el('div', { class: 'info-collapse-body' }, ...content),
+  );
+}
+
+// Wiederverwendbare Empty-State-Karte (gestrichelter Rahmen im .fokus-empty-Stil).
+// icon = Emoji oder Inline-SVG-String; buttonLabel/onClick optional.
+function emptyState(icon, title, text, buttonLabel, onClick) {
+  return el('div', { class: 'empty-state' },
+    el('div', { class: 'empty-state-icon' }, icon),
+    el('div', { class: 'empty-state-title' }, title),
+    el('div', { class: 'empty-state-text' }, text),
+    buttonLabel && el('button', { class: 'btn-primary', onClick }, buttonLabel),
   );
 }
 
@@ -201,19 +241,35 @@ function buildMonthCells(year, month) {
 // Long-Press (450ms) öffnet das Kommentar-Sheet, normaler Klick togglet den Tag.
 let lpTimer = null;
 let lpFired = false;
+let justDoneCell = null; // { habitId, idx } — kurzzeitig für Pop-Animation nach dem Abhaken
+
+const MILESTONES = [7, 21, 33, 50, 66];
+
+function showToast(text) {
+  const toast = el('div', { class: 'habit-toast' }, text);
+  document.body.append(toast);
+  setTimeout(() => toast.remove(), 2500);
+}
 function pressHandlers(habitId, idx, toggle) {
+  const clearPress = (ev) => {
+    clearTimeout(lpTimer);
+    if (ev && ev.currentTarget) ev.currentTarget.classList.remove('pressing');
+  };
   return {
-    onPointerDown: () => {
+    onPointerDown: (ev) => {
       lpFired = false;
       clearTimeout(lpTimer);
+      const cell = ev && ev.currentTarget;
+      if (cell) cell.classList.add('pressing');
       lpTimer = setTimeout(() => {
         lpFired = true;
+        if (cell) cell.classList.remove('pressing');
         try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
         openComment(habitId, idx);
       }, 450);
     },
-    onPointerUp: () => clearTimeout(lpTimer),
-    onPointerLeave: () => clearTimeout(lpTimer),
+    onPointerUp: clearPress,
+    onPointerLeave: clearPress,
     onContextMenu: (ev) => ev.preventDefault(),
     onClick: () => {
       if (lpFired) { lpFired = false; return; }
@@ -264,11 +320,7 @@ function recordLog(label) {
   if (state.uilog.length > 400) state.uilog = state.uilog.slice(0, 400);
   saveDoc('uilog', state.uilog);
   state.savedAt = now;
-  state.saveFlash = true;
-  state.saveError = false;
-  clearTimeout(flashTimer);
-  flashTimer = setTimeout(() => { state.saveFlash = false; updateSaveBtn(); }, 1800);
-  updateSaveBtn();
+  updateSaveBtn(); // zeigt sofort „Speichert …" (pendingSaves > 0)
   if (state.logOpen) renderOverlay();
 }
 
@@ -276,20 +328,57 @@ function saveUilog() {
   saveDoc('uilog', state.uilog);
 }
 
-// ---------- Speicher-Indikator ----------
+// ---------- Speicher-Status-Chip ----------
+// Passiver Status (wie Google Docs). Klick öffnet weiterhin den Verlauf;
+// im Fehlerzustand versucht der Klick zuerst erneut zu speichern (flushAll).
+// 16px-Icons als Inline-SVG. Es werden nur statische Strings gesetzt (kein User-Input).
+const SAVE_ICONS = {
+  cloud: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19a4.5 4.5 0 0 0 .5-8.98A6 6 0 0 0 6.34 9.5 3.5 3.5 0 0 0 7 19z"/><path d="m9 13 2 2 4-4"/></svg>',
+  check: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 13 4 4 10-10"/></svg>',
+  spinner: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9" opacity="0.9"/></svg>',
+  warn: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+};
+
 function updateSaveBtn() {
   const btn = refs.saveBtn;
   if (!btn) return;
-  btn.className = 'save-btn' + (state.saveError ? ' error' : state.saveFlash ? ' flash' : '');
-  if (state.saveError) btn.textContent = '⚠ Nicht gespeichert';
-  else if (state.saveFlash) btn.textContent = '✓ Gespeichert';
-  else if (state.savedAt) btn.textContent = '✓ ' + state.savedAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  else btn.textContent = '🕘 Verlauf';
+  const saving = pendingSaves() > 0;
+  const mode = state.saveError ? 'error' : saving ? 'saving' : state.saveFlash ? 'flash' : 'idle';
+  btn.className = 'save-chip save-chip--' + mode;
+  let icon, label, title;
+  if (mode === 'error') {
+    icon = SAVE_ICONS.warn; label = 'Offline — Änderungen lokal'; title = 'Erneut speichern';
+  } else if (mode === 'saving') {
+    icon = SAVE_ICONS.spinner; label = 'Speichert …'; title = 'Änderungsverlauf anzeigen';
+  } else if (mode === 'flash') {
+    icon = SAVE_ICONS.check; label = 'Gespeichert'; title = 'Änderungsverlauf anzeigen';
+  } else {
+    icon = SAVE_ICONS.cloud; label = 'Gespeichert'; title = 'Änderungsverlauf anzeigen';
+  }
+  btn.innerHTML = icon + '<span class="save-chip__label">' + label + '</span>';
+  btn.title = title;
+}
+
+function onSaveChipClick() {
+  if (state.saveError) { flushAll(); return; } // Retry, ohne den Verlauf zu öffnen
+  openLog();
 }
 
 setSaveListener((ok) => {
-  if (!ok) { state.saveError = true; updateSaveBtn(); }
+  if (ok) {
+    state.saveError = false;
+    // Kurzes grünes Häkchen (0.8 s) nach erfolgreichem Save, danach zurück zu „Gespeichert".
+    if (pendingSaves() === 0) {
+      state.saveFlash = true;
+      clearTimeout(flashTimer);
+      flashTimer = setTimeout(() => { state.saveFlash = false; updateSaveBtn(); }, 800);
+    }
+  } else {
+    state.saveError = true;
+  }
+  updateSaveBtn();
 });
+setPendingListener(() => updateSaveBtn());
 
 // ---------- Jahreswechsel ----------
 async function switchYear(delta) {
@@ -331,8 +420,8 @@ function selectTab(id) {
 
 // ---------- Header ----------
 function renderHeader() {
-  const showYearPicker = state.tab !== 'habits' && state.tab !== 'frei' && state.tab !== 'challenges';
-  refs.saveBtn = el('button', { class: 'save-btn', title: 'Änderungsverlauf anzeigen', onClick: openLog });
+  const showYearPicker = state.tab !== 'heute' && state.tab !== 'habits' && state.tab !== 'frei' && state.tab !== 'challenges';
+  refs.saveBtn = el('button', { class: 'save-chip save-chip--idle', title: 'Änderungsverlauf anzeigen', onClick: onSaveChipClick });
   const header = el('header', { class: 'header' },
     el('div', { class: 'header-left' },
       el('div', { class: 'logo' }, 'L'),
@@ -367,11 +456,13 @@ function renderBottomNav() {
   return el('nav', { class: 'bottom-nav' },
     TABS.map((t) => {
       const meta = BOTTOM_NAV[t.id];
+      const iconWrap = el('span', { class: 'bottom-nav-icon' });
+      iconWrap.innerHTML = meta.icon;
       return el('button', {
         class: 'bottom-nav-btn' + (state.tab === t.id ? ' active' : ''),
         onClick: () => selectTab(t.id),
       },
-        el('span', { class: 'bottom-nav-icon' }, meta.icon),
+        el('span', { class: 'bottom-nav-pill' }, iconWrap),
         el('span', { class: 'bottom-nav-label' }, meta.label),
       );
     }),
@@ -379,7 +470,7 @@ function renderBottomNav() {
 }
 
 // ---------- Radar-Chart (SVG, Geometrie 1:1 aus dem Prototyp) ----------
-function buildRadar() {
+function buildRadar(animate = false) {
   const scores = state.doc.scores;
   const cx = 170, cy = 160, R = 110, N = AREAS.length;
   const pt = (i, r) => {
@@ -395,11 +486,14 @@ function buildRadar() {
     return svg('line', { x1: cx, y1: cy, x2, y2, stroke: '#3C4043', 'stroke-width': 1 });
   });
   const dataPts = AREAS.map((a, i) => pt(i, (R * (scores[a.id] || 1)) / 10));
-  const poly = svg('polygon', {
+  // Aufbau-Animation nur beim Tab-Wechsel zum Dashboard (animate=true), nicht bei Slider-Updates.
+  const polyAttrs = {
     points: dataPts.map((p) => p.join(',')).join(' '),
     fill: 'rgba(138,180,248,0.25)', stroke: '#8AB4F8', 'stroke-width': 2.5,
-    'stroke-linejoin': 'round', style: 'transition:all .3s ease;',
-  });
+    'stroke-linejoin': 'round', style: 'transition:all .3s ease;transform-origin:center;',
+  };
+  if (animate) polyAttrs.class = 'radar-poly-build';
+  const poly = svg('polygon', polyAttrs);
   const dots = dataPts.map((p, i) => svg('circle', {
     cx: p[0], cy: p[1], r: 4.5, fill: AREAS[i].color, stroke: '#1E1F20', 'stroke-width': 2,
   }));
@@ -444,11 +538,135 @@ function updateScoreVisuals(area) {
 }
 
 // ---------- Dashboard ----------
+// Tageszeit-abhängige Begrüßung (5–11 Morgen, 11–18 Tag, sonst Abend).
+function greetingText() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 11) return 'Guten Morgen ☀️';
+  if (h >= 11 && h < 18) return 'Guten Tag 👋';
+  return 'Guten Abend 🌙';
+}
+
+// ---------- Heute (Standard-Tab: Tages-Cockpit über bestehende Daten) ----------
+function renderHeute() {
+  const g = state.global;
+  const now = new Date();
+  const today = isoOf(now);
+  const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+
+  // 1) Begrüßung nach Uhrzeit + Datum
+  const h = now.getHours();
+  const greeting = h < 11 ? 'Guten Morgen' : h < 18 ? 'Guten Tag' : 'Guten Abend';
+  const greetCard = el('div', { class: 'card p24 heute-greet' },
+    el('div', { class: 'heute-greet-title' }, greeting),
+    el('div', { class: 'heute-greet-date' },
+      now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })),
+  );
+
+  // 2) Heutige Habits — Tag-Index = Tagesdifferenz seit startDate, gültig 0..65
+  const habits = g.habits || [];
+  const todaysHabits = habits
+    .map((hab) => {
+      const start = new Date((hab.startDate || today) + 'T00:00:00');
+      const idx = Math.round((midnight - start) / 86400000);
+      return { hab, idx };
+    })
+    .filter(({ idx }) => idx >= 0 && idx <= 65);
+
+  function toggleHabitToday(hab, idx) {
+    const next = g.habits.map((x) =>
+      x.id === hab.id ? { ...x, days: x.days.map((v, j) => (j === idx ? !v : v)) } : x);
+    setGlobal({ habits: next }, 'Habit Tracker aktualisiert');
+    sendEvent('habit_checked', { habitId: hab.id, idx });
+    render();
+  }
+
+  const habitsCard = el('div', { class: 'card p24' },
+    el('div', { class: 'card-title' }, 'Heutige Habits'),
+    todaysHabits.length === 0
+      ? el('div', { class: 'card-sub', style: 'margin-top:8px;' }, 'Für heute stehen keine aktiven Habits an.')
+      : el('div', { class: 'heute-habit-list' },
+        todaysHabits.map(({ hab, idx }) => {
+          const done = !!(hab.days && hab.days[idx]);
+          return el('div', { class: 'heute-habit-row' },
+            el('span', { class: 'heute-habit-name' }, hab.name || 'Habit'),
+            el('button', {
+              class: 'heute-check' + (done ? ' done' : ''),
+              title: done ? 'Als offen markieren' : 'Als erledigt markieren',
+              onClick: () => toggleHabitToday(hab, idx),
+            }, done ? '✓' : ''),
+          );
+        }),
+      ),
+  );
+
+  // 3) Heute clean? — dieselbe Logik wie im Frei-Tab
+  const F = g.frei || {};
+  const log = F.log || {};
+  const cleanVal = log[today];
+  function markToday(status) {
+    const next = { ...log };
+    if (log[today] === status) delete next[today]; else next[today] = status;
+    setFrei({ log: next }, 'Freiheit & Kontrolle aktualisiert');
+    sendEvent('frei_day_marked', { date: today, status: next[today] || null });
+    render();
+  }
+  const cleanCard = el('div', { class: 'card p24' },
+    el('div', { class: 'card-title' }, 'Heute clean?'),
+    cleanVal
+      ? el('div', { class: 'heute-clean-status' },
+        el('span', { class: 'heute-clean-badge ' + cleanVal },
+          cleanVal === 'clean' ? '✓ Heute clean' : 'Rückfall eingetragen'),
+        el('button', { class: 'link-btn', onClick: () => markToday(cleanVal) }, 'Ändern'),
+      )
+      : el('div', { class: 'frei-checkin-row', style: 'margin-bottom:0;' },
+        el('button', { class: 'frei-checkin-btn clean', onClick: () => markToday('clean') }, 'Clean ✓'),
+        el('button', { class: 'frei-checkin-btn fall', onClick: () => markToday('fall') }, 'Rückfall'),
+      ),
+  );
+
+  // 4) Challenge der Woche — ISO-Woche, auf 1..52 gemappt wie im Challenges-Tab
+  const weekNr = ((isoWeek(now) - 1) % 52) + 1;
+  const weekCh = CHALLENGES.find((c) => c.id === weekNr);
+  const chState = weekCh && ((g.challenges || {})[weekCh.id] || { done: false });
+  const challengeCard = weekCh && el('button', {
+    class: 'card p24 heute-challenge' + (chState.done ? ' done' : ''),
+    onClick: () => selectTab('challenges'),
+  },
+    el('div', { class: 'heute-challenge-label' }, 'CHALLENGE DER WOCHE · KW ' + weekNr),
+    el('div', { class: 'heute-challenge-title' }, weekCh.title),
+    el('div', { class: 'heute-challenge-status' },
+      chState.done ? '✓ Erledigt' : 'Noch offen — antippen zum Öffnen'),
+  );
+
+  // 5) Dankbarkeit — dieselbe Logik wie im Frei-Tab
+  const dankCard = el('div', { class: 'card p24' },
+    el('div', { class: 'card-title' }, 'Dankbarkeit'),
+    el('input', {
+      class: 'heute-dank-input', type: 'text',
+      placeholder: 'Wofür bist du heute dankbar?',
+      value: (F.dank || {})[today] || '',
+      onChange: (ev) => {
+        setFrei({ dank: { ...(F.dank || {}), [today]: ev.target.value } }, 'Dankbarkeit bearbeitet');
+        sendEvent('frei_dank_edited', { date: today });
+      },
+    }),
+  );
+
+  return el('div', { class: 'heute-stack' },
+    greetCard, habitsCard, cleanCard, challengeCard, dankCard);
+}
+
 function renderDashboard() {
   const s = state.doc;
   const weakest = weakestArea();
 
-  refs.radar = buildRadar();
+  const greeting = el('div', { class: 'dash-greeting' },
+    el('div', { class: 'dash-greeting-title' }, greetingText()),
+    el('div', { class: 'dash-greeting-date' },
+      new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })),
+  );
+
+  refs.radar = buildRadar(true);
   refs.avg = el('span', { class: 'avg-num' }, avgScoreText());
 
   const radarCard = el('div', { class: 'card p28 radar-card radar-card-slot' },
@@ -490,8 +708,8 @@ function renderDashboard() {
       ),
       el('div', { class: 'range-row' },
         el('span', { class: 'range-end' }, '1'),
-        el('input', {
-          type: 'range', min: '1', max: '10', step: '1', value: String(score),
+        rangeSlider({
+          value: score,
           onInput: (ev) => {
             s.scores[a.id] = Number(ev.target.value);
             updateScoreVisuals(a);
@@ -520,6 +738,7 @@ function renderDashboard() {
   });
 
   return el('div', { class: 'screen', 'data-screen-label': 'Dashboard' },
+    greeting,
     el('div', { class: 'grid-top' }, radarCard, coachCard),
     el('h2', { class: 'section-h2' }, 'Die 6 Lebensbereiche'),
     el('div', { class: 'section-sub' }, 'Bewerte deinen Ist-Zustand und beschreibe ausführlich deine „10 von 10" — den absoluten Idealzustand.'),
@@ -582,8 +801,8 @@ function renderFokus() {
           el('div', { class: 'fokus-reflexion-title' }, 'Reflexion: Was lief wirklich?'),
           el('div', { class: 'fokus-endscore-row' },
             el('span', { class: 'range-end' }, '1'),
-            el('input', {
-              type: 'range', min: '1', max: '10', step: '1', value: String(endScore),
+            rangeSlider({
+              value: endScore,
               onChange: (ev) => {
                 s.endScores = s.endScores || {};
                 s.endScores[a.id] = Number(ev.target.value);
@@ -616,7 +835,11 @@ function renderFokus() {
   });
 
   const noFocus = s.focus.length === 0
-    && el('div', { class: 'fokus-empty' }, 'Noch kein Fokus gewählt. Wähle oben 1–' + MAX_FOKUS + ' Bereiche, um Ziele zu definieren.');
+    && emptyState(
+      '🎯',
+      'Wähle deine ' + MAX_FOKUS + ' Fokus-Bereiche',
+      'Weniger ist mehr: Konzentriere dich dieses Jahr auf maximal zwei Lebensbereiche.',
+    );
 
   return el('div', { class: 'screen fokus-screen', 'data-screen-label': 'Fokus und Jahresziele' },
     el('h2', { class: 'section-h2' }, 'Jahresfokus ' + state.year),
@@ -809,7 +1032,7 @@ function renderFreiTagebuch() {
     el('div', { class: 'frei-field' },
       el('div', { class: 'frei-field-label', style: 'color:#81C995;' }, 'DANKBARKEIT — 3 DINGE, TÄGLICH'),
       mdField({
-        rows: 3, placeholder: '1. …\n2. …\n3. …',
+        rows: 3, placeholder: 'Drei Dinge, für die du heute dankbar bist …',
         value: (F.dank || {})[selDate] || '',
         title: 'Dankbarkeit · ' + selDate,
         onCommit: (v) => {
@@ -821,7 +1044,7 @@ function renderFreiTagebuch() {
     el('div', {},
       el('div', { class: 'frei-field-label', style: 'color:#8AB4F8;' }, 'TAGEBUCH — WIE WAR DER TAG?'),
       mdField({
-        rows: 5, placeholder: 'Was ist passiert? Wie ging es dir? Was hast du gelernt?',
+        rows: 5, placeholder: 'Wie war dein Tag? Zwei Sätze reichen.',
         value: (F.diary || {})[selDate] || '',
         title: 'Tagebuch · ' + selDate,
         onCommit: (v) => {
@@ -911,18 +1134,22 @@ function renderFreiUrge() {
           onChange: (ev) => setD({ time: ev.target.value }),
         }),
       ),
-      el('div', {},
-        el('div', { class: 'frei-field-label' }, 'INTENSITÄT DES DRANGS'),
-        el('div', { class: 'frei-intensity-row' },
-          el('span', { class: 'range-end' }, '1'),
-          el('input', {
-            type: 'range', min: '1', max: '10', step: '1', value: String(d.intensity),
-            onChange: (ev) => setD({ intensity: Number(ev.target.value) }),
-          }),
-          el('span', { class: 'range-end' }, '10'),
-          el('span', { class: 'frei-intensity-val' }, String(d.intensity)),
-        ),
-      ),
+      (() => {
+        const intensityVal = el('span', { class: 'frei-intensity-val' }, String(d.intensity));
+        return el('div', {},
+          el('div', { class: 'frei-field-label' }, 'INTENSITÄT DES DRANGS'),
+          el('div', { class: 'frei-intensity-row' },
+            el('span', { class: 'range-end' }, '1'),
+            rangeSlider({
+              value: d.intensity,
+              onInput: (ev) => { intensityVal.textContent = ev.target.value; },
+              onChange: (ev) => setD({ intensity: Number(ev.target.value) }),
+            }),
+            el('span', { class: 'range-end' }, '10'),
+            intensityVal,
+          ),
+        );
+      })(),
     ),
     el('div', { class: 'frei-grid-2' },
       el('div', {},
@@ -992,6 +1219,14 @@ function renderFreiUrge() {
           const patch = { urges: urgesNext };
           if (d.outcome === 'gave') patch.log = { ...(F.log || {}), [entryDate]: 'fall' };
           state.urgeDraft = null;
+          // Reines UI-Feedback nach dem Speichern (nichts Neues gespeichert):
+          if (d.outcome === 'res') {
+            state.urgeCelebration = { n: urgesNext.filter((x) => x.outcome === 'res').length };
+            state.urgeGaveNote = false;
+          } else {
+            state.urgeGaveNote = true;
+            state.urgeCelebration = null;
+          }
           setFrei(patch, 'Urge protokolliert');
           sendEvent('urge_logged', { outcome: d.outcome, intensity: d.intensity, date: entryDate });
           render();
@@ -1007,6 +1242,7 @@ function renderFreiUrge() {
   const openBtn = !d && el('button', {
     class: 'btn-primary frei-urge-open-btn',
     onClick: () => {
+      state.urgeGaveNote = false;
       const n = new Date();
       state.urgeDraft = {
         outcome: 'res', intensity: 5, halt: {}, umgebung: false,
@@ -1086,6 +1322,8 @@ function renderFreiUrge() {
     soforthilfe,
     openBtn,
     form,
+    (!d && state.urgeGaveNote) && el('div', { class: 'card frei-gave-note' },
+      'Eingetragen. Ein Ausrutscher ist ein Datenpunkt, kein Urteil.'),
     el('div', { class: 'frei-urge-history-title' }, 'Gemeldete Urges'),
     urgeList,
   );
@@ -1134,7 +1372,99 @@ function renderFreiGenerell() {
     ),
   );
 
-  return el('div', {}, circlesCard, warumCard);
+  return el('div', {}, renderFreiStats(), circlesCard, warumCard);
+}
+
+// Statistik-Karten für Freiheit → generell. Rein lesend aus global.frei — speichert nichts.
+function renderFreiStats() {
+  const F = state.global.frei || {};
+  const log = F.log || {};
+  const urges = F.urges || [];
+
+  // ---- Karte 1: Jahres-Heatmap (GitHub-Contribution-Stil) ----
+  const now = new Date();
+  const year = now.getFullYear();
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const todayStr = fmt(now);
+
+  // Erste Spalte beginnt am Montag der Woche des 1. Januar.
+  const jan1 = new Date(year, 0, 1);
+  const startOffset = (jan1.getDay() + 6) % 7; // Mo=0 … So=6
+  const gridStart = new Date(year, 0, 1 - startOffset);
+
+  const CELL = 10, GAP = 2, STEP = CELL + GAP, COLS = 53;
+  const svgW = COLS * STEP - GAP;
+  const svgH = 7 * STEP - GAP;
+  const COLORS = { clean: '#81C995', fall: '#F28B82' };
+
+  const cells = [];
+  for (let c = 0; c < COLS; c++) {
+    for (let r = 0; r < 7; r++) {
+      const d = new Date(gridStart);
+      d.setDate(gridStart.getDate() + c * 7 + r);
+      let fill;
+      if (d.getFullYear() > year || (d.getFullYear() === year && fmt(d) > todayStr)) fill = 'transparent';
+      else if (d.getFullYear() < year) fill = 'transparent';
+      else fill = COLORS[log[fmt(d)]] || '#2A2B2C';
+      cells.push(svg('rect', {
+        x: c * STEP, y: r * STEP, width: CELL, height: CELL, rx: 2, ry: 2, fill,
+      }, svg('title', {}, `${fmt(d)}${log[fmt(d)] ? ' — ' + (log[fmt(d)] === 'clean' ? 'clean' : 'Rückfall') : ''}`)));
+    }
+  }
+  const heatSvg = svg('svg', { width: svgW, height: svgH, viewBox: `0 0 ${svgW} ${svgH}`, style: 'display:block;' }, cells);
+
+  const scroller = el('div', { style: 'overflow-x:auto;' }, heatSvg);
+  // Aktuellen Monat initial sichtbar: nach rechts scrollen bis heute.
+  const daysFromStart = Math.floor((now - gridStart) / 86400000);
+  const curCol = Math.floor(daysFromStart / 7);
+  requestAnimationFrame(() => { scroller.scrollLeft = Math.max(0, (curCol - 6) * STEP); });
+
+  const heatCard = el('div', { class: 'card p24' },
+    el('div', { class: 'frei-card-title' }, 'Statistik'),
+    el('div', { class: 'frei-card-sub' }, `Jahres-Übersicht ${year} — grün = clean, rot = Rückfall.`),
+    scroller,
+  );
+
+  // ---- Karte 2: Sieg-Quote ----
+  const res = urges.filter((u) => u.outcome === 'res').length;
+  const gave = urges.filter((u) => u.outcome === 'gave').length;
+  const total = res + gave;
+  let quoteBody;
+  if (total === 0) {
+    quoteBody = el('div', { class: 'frei-card-sub', style: 'margin-top:0;' }, 'Noch keine Urges protokolliert.');
+  } else {
+    const pct = Math.round((res / total) * 100);
+    quoteBody = el('div', {},
+      el('div', { style: 'margin-bottom:10px;' }, `${res} von ${total} Urges widerstanden — ${pct} %`),
+      el('div', { style: 'display:flex;height:12px;border-radius:100px;overflow:hidden;background:#2A2B2C;' },
+        el('div', { style: `width:${pct}%;background:#81C995;` }),
+        el('div', { style: `width:${100 - pct}%;background:#F28B82;` }),
+      ),
+    );
+  }
+  const quoteCard = el('div', { class: 'card p24' },
+    el('div', { class: 'frei-card-title' }, 'Sieg-Quote'),
+    quoteBody,
+  );
+
+  // ---- Karte 3: Muster ----
+  const counts = {};
+  for (const u of urges) {
+    const s = (u.situation || '').trim();
+    if (s) counts[s] = (counts[s] || 0) + 1;
+  }
+  const topTriggers = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 3).map((e) => e[0]);
+  const intensities = urges.map((u) => Number(u.intensity)).filter((n) => !Number.isNaN(n));
+  const avgInt = intensities.length ? (intensities.reduce((a, b) => a + b, 0) / intensities.length).toFixed(1) : null;
+
+  const musterCard = el('div', { class: 'card p24' },
+    el('div', { class: 'frei-card-title' }, 'Muster'),
+    el('div', { style: 'margin-bottom:6px;' },
+      'Häufigste Auslöser: ' + (topTriggers.length ? topTriggers.join(', ') : '—')),
+    el('div', {}, 'Ø Intensität: ' + (avgInt != null ? avgInt : '—')),
+  );
+
+  return el('div', {}, heatCard, quoteCard, musterCard);
 }
 
 function renderFrei() {
@@ -1226,7 +1556,33 @@ function renderChallenges() {
       ),
     );
 
-    return el('div', { class: 'card ch-card' + (isWeek ? ' ch-current' : '') }, head, body);
+    return el('div', { class: 'card ch-card' }, head, body);
+  }
+
+  function heroCard() {
+    const c = CHALLENGES.find((x) => x.id === weekNr);
+    if (!c) return null;
+    const st = all[c.id] || { done: false, doneAt: null, note: '' };
+    const toggle = () => {
+      const done = !st.done;
+      setChallenge(c.id, { done, doneAt: done ? new Date().toISOString().slice(0, 10) : null });
+      sendEvent('challenge_toggled', { challengeId: c.id, done });
+      render();
+    };
+
+    return el('div', { class: 'ch-hero' + (st.done ? ' done' : '') },
+      el('span', { class: 'ch-hero-label' }, 'CHALLENGE DER WOCHE · KW ' + weekNr),
+      el('span', { class: 'ch-hero-title' }, c.title),
+      el('p', { class: 'ch-hero-text' }, c.text[0] || ''),
+      el('div', { class: 'ch-hero-actions' },
+        st.done
+          ? [
+              el('span', { class: 'ch-hero-done' }, '✓ Diese Woche geschafft'),
+              el('button', { class: 'btn-ghost', onClick: toggle }, 'Rückgängig'),
+            ]
+          : el('button', { class: 'btn-primary', onClick: toggle }, 'Erledigt ✓'),
+      ),
+    );
   }
 
   const filterRow = el('div', { class: 'frei-subtabs' },
@@ -1239,6 +1595,7 @@ function renderChallenges() {
   return el('div', { class: 'screen', 'data-screen-label': 'Mini-Challenges' },
     el('h2', { class: 'section-h2', style: 'margin-top:0;' }, 'Mini-Challenges'),
     el('div', { class: 'frei-intro' }, '52 Wochen-Impulse aus »Dieses Buch verändert dein Leben für immer« (Martin Wehrle). Eine Challenge pro Woche reicht — klein anfangen, groß wirken.'),
+    heroCard(),
     el('div', { class: 'ch-progress' },
       el('div', { class: 'ch-progress-bar' }, el('div', { class: 'ch-progress-fill', style: 'width:' + Math.round((doneCount / CHALLENGES.length) * 100) + '%;' })),
       el('span', { class: 'ch-progress-label' }, doneCount + ' / ' + CHALLENGES.length + ' erledigt'),
@@ -1257,10 +1614,26 @@ function renderHabits() {
   const isStreak = (g.habitViewMode || 'streak') === 'streak';
 
   function toggleIndex(h, i) {
+    const nowDone = !h.days[i];
     const habits = g.habits.map((x) =>
       x.id === h.id ? { ...x, days: x.days.map((v, j) => (j === i ? !v : v)) } : x);
     setGlobal({ habits }, 'Habit Tracker aktualisiert');
     sendEvent('habit_checked', { habitId: h.id, idx: i });
+    if (nowDone) {
+      justDoneCell = { habitId: h.id, idx: i };
+      try { if ('vibrate' in navigator) navigator.vibrate(10); } catch (e) {}
+      const doneCount = habits.find((x) => x.id === h.id).days.filter(Boolean).length;
+      if (MILESTONES.includes(doneCount)) {
+        if (doneCount === 66) {
+          showToast('🏆 66 Tage — Gewohnheit verankert!');
+          try { if ('vibrate' in navigator) navigator.vibrate([30, 50, 30]); } catch (e) {}
+        } else {
+          showToast('🎉 ' + doneCount + ' Tage geschafft!');
+        }
+      }
+    } else {
+      justDoneCell = null;
+    }
     render();
   }
 
@@ -1291,7 +1664,7 @@ function renderHabits() {
   const noHabits = g.habits.length === 0;
   const formOpen = noHabits || habitFormOpen;
 
-  const addForm = el('div', { class: 'habit-add-card' },
+  const addForm = el('div', { class: 'habit-add-card', id: 'habit-add-card' },
     el('div', { class: 'habit-add-title' }, 'Neue Gewohnheit anlegen'),
     el('input', {
       class: 'habit-input', value: g.newHabitName, placeholder: 'Gewohnheit, z. B. Fitnessstudio',
@@ -1370,7 +1743,11 @@ function renderHabits() {
     ),
   );
 
-  const habitCards = g.habits.map((h) => {
+  // Einmaliger Hinweis auf die versteckte Long-Press-Notiz — verschwindet dauerhaft,
+  // sobald irgendein Habit mindestens einen Kommentar hat.
+  const anyComment = g.habits.some((h) => Object.keys(h.comments || {}).length > 0);
+
+  const habitCards = g.habits.map((h, hi) => {
     const doneCount = h.days.filter(Boolean).length;
     const startDate = h.startDate || daysAgoISO(0);
     const hasWhy = !!(h.kurz || h.mittel || h.lang);
@@ -1384,9 +1761,12 @@ function renderHabits() {
         const isToday = isSameDate(date, today);
         const hasComment = !!((h.comments || {})[i]);
         const ph = pressHandlers(h.id, i, () => toggleIndex(h, i));
+        const isJustDone = !!(d && justDoneCell && justDoneCell.habitId === h.id && justDoneCell.idx === i);
+        if (isJustDone) justDoneCell = null;
         return el('button', {
-          class: 'habit-day-btn' + (d ? ' done' : '') + (isToday ? ' today' : ''),
+          class: 'habit-day-btn' + (d ? ' done' : '') + (isToday ? ' today' : '') + (isJustDone ? ' just-done' : ''),
           title: WEEKDAYS[(date.getDay() + 6) % 7] + ', ' + date.toLocaleDateString('de-DE') + ' — Tag ' + (i + 1) + (hasComment ? ' · 💬 ' + (h.comments || {})[i] : ''),
+          onAnimationend: (ev) => { if (ev.animationName === 'pop') ev.target.classList.remove('just-done'); },
           ...ph,
         },
           WEEKDAYS[(date.getDay() + 6) % 7][0],
@@ -1406,8 +1786,11 @@ function renderHabits() {
         return el('div', { class: 'habit-month-cell out-of-range' }, String(date.getDate()));
       }
       const ph = pressHandlers(h.id, idx, () => toggleIndex(h, idx));
+      const isJustDone = !!(d && justDoneCell && justDoneCell.habitId === h.id && justDoneCell.idx === idx);
+      if (isJustDone) justDoneCell = null;
       return el('button', {
-        class: 'habit-month-cell' + (d ? ' done' : '') + (isToday ? ' today' : ''),
+        class: 'habit-month-cell' + (d ? ' done' : '') + (isToday ? ' today' : '') + (isJustDone ? ' just-done' : ''),
+        onAnimationend: (ev) => { if (ev.animationName === 'pop') ev.target.classList.remove('just-done'); },
         ...ph,
       },
         String(date.getDate()),
@@ -1451,6 +1834,8 @@ function renderHabits() {
           WEEKDAYS.map((wd) => el('div', { class: 'habit-month-weekday' }, wd))),
         monthWeeks,
       ),
+      (hi === 0 && !anyComment) && el('div', { class: 'habit-tip' },
+        '💡 Tipp: Tag lange gedrückt halten, um eine Notiz zu speichern.'),
       disziplin && el('div', { class: 'habit-disziplin-note' },
         '⚡ ', el('b', {}, 'Tag 10 erreicht — das Motivations-Tal beginnt.'),
         ' Die Motivation lässt jetzt nach. Ab heute zählt nur noch Arbeitsmoral und Disziplin.'),
@@ -1471,11 +1856,22 @@ function renderHabits() {
   const heading = el('h2', { class: 'section-h2', style: 'margin-top:0;' }, 'Der verbindliche Wochenplan');
 
   if (noHabits) {
-    // Leerer Zustand: Intro-Texte oben, Formular aufgeklappt (wie bisher).
+    // Leerer Zustand: einladende Empty-State-Karte + Intro-Texte, Formular aufgeklappt.
+    const empty = emptyState(
+      '🌱',
+      'Starte deine erste Gewohnheit',
+      '66 Tage machen aus einem Vorsatz eine Routine. Klein anfangen zählt.',
+      'Gewohnheit anlegen',
+      () => {
+        document.getElementById('habit-add-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => document.querySelector('#habit-add-card .habit-input')?.focus(), 300);
+      },
+    );
     return el('div', { class: 'screen habits-screen', 'data-screen-label': 'Habit Tracker' },
       heading,
       introText,
       whyBox,
+      empty,
       addCard,
       toolbar,
       habitCards,
@@ -1599,12 +1995,38 @@ function renderOverlay() {
   document.getElementById('app').append(refs.overlay);
 }
 
+// Sieg-Overlay nach „Widerstanden" — reines UI, speichert nichts.
+function renderUrgeCelebration() {
+  const c = state.urgeCelebration;
+  if (!c) return null;
+  const close = () => { state.urgeCelebration = null; render(); };
+  const gewinn = ((state.global.frei && state.global.frei.gewinn) || '').trim();
+  let whyCard = null;
+  if (gewinn) {
+    const whyText = el('div', { class: 'urge-win-why-text' });
+    whyText.innerHTML = mdToHtml(gewinn);
+    whyCard = el('div', { class: 'card urge-win-why' },
+      el('div', { class: 'urge-win-why-head' }, 'Dein Warum:'),
+      whyText,
+    );
+  }
+  return el('div', { class: 'urge-win-overlay', 'data-screen-label': 'Sieg' },
+    el('div', { class: 'urge-win-inner' },
+      el('div', { class: 'urge-win-title' }, 'Du hast widerstanden 💪'),
+      el('div', { class: 'urge-win-count' }, 'Das war Sieg Nr. ' + c.n),
+      whyCard,
+      el('button', { class: 'urge-win-btn', onClick: close }, 'Weiter'),
+    ),
+  );
+}
+
 // ---------- Render ----------
 function render() {
   const root = document.getElementById('app');
   refs.overlay = null;
   const main = el('main', {},
-    state.tab === 'dashboard' ? renderDashboard()
+    state.tab === 'heute' ? renderHeute()
+      : state.tab === 'dashboard' ? renderDashboard()
       : state.tab === 'fokus' ? renderFokus()
       : state.tab === 'habits' ? renderHabits()
       : state.tab === 'challenges' ? renderChallenges()
@@ -1614,6 +2036,8 @@ function render() {
   if (state.logOpen) renderOverlay();
   const sheet = renderCommentSheet();
   if (sheet) root.append(sheet);
+  const win = renderUrgeCelebration();
+  if (win) root.append(win);
 }
 
 function renderBoot(text, isError, retry) {
@@ -1632,7 +2056,7 @@ function renderBoot(text, isError, retry) {
 async function init() {
   const p = loadPrefs();
   state.year = Number(p.year) || JAHR_DEFAULT;
-  state.tab = TABS.some((t) => t.id === p.tab) ? p.tab : 'dashboard';
+  state.tab = TABS.some((t) => t.id === p.tab) ? p.tab : 'heute';
   renderBoot('Lade Daten …');
   try {
     const [doc, uilog, global] = await Promise.all([
