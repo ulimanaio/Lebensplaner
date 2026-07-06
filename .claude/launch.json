@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "lebensplaner-dev",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:/Users/Xerex/AppData/Local/Temp/claude/C--Users-Xerex-Documents-GitHub-Lebensplaner/b940e178-b152-46bd-ab6c-b42289038f78/scratchpad/devserver.mjs"],
+      "port": 8484
+    }
+  ]
+}
