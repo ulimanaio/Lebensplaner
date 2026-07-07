@@ -34,8 +34,12 @@ Bereich-IDs (`AREAS` in app.js): `koerper, soziales, liebe, finanzen, karriere, 
   overloadWarn: false,
   freiTab: "tagebuch" | "urge" | "generell",
   freiSelDate, freiCalYear, freiCalMonth,
-  challenges: { <1–52>: { done: bool, doneAt: "YYYY-MM-DD"|null, note: "Text" } }, // Tab „Challenges“
+  challenges: { <1–52>: { done: bool, doneAt: "YYYY-MM-DD"|null, note: "Text" } }, // Wehrle-Buch im Tab „Bücher“
   challengeOpen: <id>|null, challengeFilter: "alle"|"offen"|"erledigt",
+  bookOpen: <bookId>|null,               // Tab „Bücher“: geöffnetes Buch (null = Regal-Übersicht)
+  bookTasks: { <bookId>: [{ id, type: "reflexion"|"liste"|"uebung", title, page, prompt,
+    answer, items: ["…"], done, doneAt, createdAt }] },  // selbst festgehaltene Aufgaben je Task-Buch (z. B. "stahl-kind")
+  bookTaskOpen: <id>|null, bookTaskFilter: "alle"|"offen"|"erledigt",
   frei: {                               // Tab „Freiheit & Kontrolle“
     log:   { "YYYY-MM-DD": "clean" | "fall" },
     urges: [{ id, date, time, outcome: "res"|"gave", intensity: 1–10,
@@ -59,7 +63,8 @@ Explizit via `sendEvent()`: `score_changed, vision_edited, focus_toggled, goal_e
 end_score_changed, reflexion_edited, habit_added, habit_checked, habit_removed,
 habit_comment_saved, frei_day_marked, frei_dank_edited, frei_diary_edited,
 frei_field_edited, urge_logged, urge_removed, year_switched, tab_selected,
-history_entry_removed, history_cleared, import, challenge_toggled, challenge_note_edited`.
+history_entry_removed, history_cleared, import, challenge_toggled, challenge_note_edited,
+book_opened, book_task_added, book_task_edited, book_task_toggled, book_task_removed`.
 
 ## Code-Wegweiser (app.js, ~1470 Zeilen — gezielt springen statt alles lesen)
 | Bereich | Funktionen |
@@ -71,7 +76,8 @@ history_entry_removed, history_cleared, import, challenge_toggled, challenge_not
 | Fokus & Ziele | `renderFokus` |
 | Freiheit & Kontrolle | `renderFrei` + `renderFreiTagebuch` / `renderFreiUrge` / `renderFreiGenerell` (enthält `renderFreiStats`: Heatmap/Sieg-Quote/Muster, rein lesend, speichert nichts) |
 | Habit Tracker | `renderHabits`, `pressHandlers` (Long-Press), `renderCommentSheet` |
-| Mini-Challenges | `renderChallenges`, `setChallenge`, `isoWeek`; statische Daten in `frontend/js/challenges-data.js` (52 Einträge aus Wehrle-Buch, `Sources/`) |
+| Bücher (Tab, Regal + Buch-Aufgaben) | `renderBuecher`, `renderBookShelf`, `renderBookTasks`, `setBookTask`, `openBook`; Buch-Registry `BOOKS` + Aufgaben-Typen `TASK_TYPES` am Dateianfang — neue Bücher dort ergänzen |
+| Mini-Challenges (Wehrle-Buch im Bücher-Tab) | `renderChallenges`, `setChallenge`, `isoWeek`; statische Daten in `frontend/js/challenges-data.js` (52 Einträge aus Wehrle-Buch, `Sources/`) |
 | Verlauf-Drawer | `renderOverlay`, `openLog` |
 | Boot/Init | `init`, `renderBoot` |
 

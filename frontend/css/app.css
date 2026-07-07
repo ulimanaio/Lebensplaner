@@ -742,6 +742,74 @@ main { max-width: 1180px; margin: 0 auto; padding: clamp(16px, 4vw, 32px) clamp(
 .ch-done-at { font-size: 12px; color: var(--mut); }
 @media (max-width: 600px) { .ch-body { padding-left: 20px; } }
 
+/* ---------- Bücher (Regal + Aufgaben) ---------- */
+.bk-shelf { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.bk-card {
+  display: flex; align-items: center; gap: 16px; width: 100%; text-align: left;
+  background: var(--card); border: none; border-radius: 24px; padding: 18px 20px;
+  cursor: pointer; min-height: 44px; font-family: var(--font-body);
+}
+.bk-card:hover { background: var(--hover); }
+.bk-card:active { transform: scale(0.99); }
+.bk-cover {
+  flex: none; width: 48px; height: 64px; border-radius: 4px 10px 10px 4px;
+  display: flex; align-items: center; justify-content: center; font-size: 22px;
+  box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.12);
+}
+.bk-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bk-card-title { font-family: var(--font-display); font-size: 15px; font-weight: 500; color: var(--title); }
+.bk-card-author { font-size: 13px; color: var(--mut); }
+.bk-card-progress { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.bk-card-bar { flex: 1; max-width: 180px; height: 6px; background: var(--inset); border-radius: 100px; overflow: hidden; }
+.bk-card-fill { display: block; height: 100%; border-radius: 100px; transition: width .3s; }
+.bk-card-label { font-size: 12px; color: var(--mut); white-space: nowrap; }
+.bk-back {
+  background: none; border: none; color: var(--accent); cursor: pointer;
+  font-family: var(--font-display); font-size: 14px; font-weight: 500;
+  min-height: 44px; padding: 0 4px; display: inline-flex; align-items: center; gap: 4px;
+  align-self: flex-start;
+}
+.bk-back:hover { color: var(--accent-hover); }
+.bk-stack { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+.bt-type-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.bt-chip {
+  background: var(--inset); color: var(--sec); border: 1px solid var(--border);
+  border-radius: 100px; padding: 10px 16px; font-size: 13px; cursor: pointer;
+  min-height: 44px; font-family: var(--font-display);
+}
+.bt-chip:hover { filter: brightness(1.15); }
+.bt-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(138, 180, 248, 0.12); }
+.bt-type-hint { font-size: 12px; color: var(--mut); margin-top: -4px; }
+.bt-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--mut); margin: 16px 0 6px;
+}
+.ch-body .bt-label:first-child { margin-top: 0; }
+.bk-items { display: flex; flex-direction: column; gap: 8px; }
+.bk-item-row { display: flex; align-items: center; gap: 8px; }
+.bk-item-nr { flex: none; min-width: 20px; font-size: 13px; color: var(--dim); text-align: right; }
+.bk-item-input {
+  flex: 1; min-width: 0; background: var(--inset); border: 1px solid var(--border); color: var(--body);
+  border-radius: 12px; padding: 10px 14px; font-size: 14px; font-family: var(--font-body); min-height: 44px;
+}
+.bk-item-remove {
+  flex: none; width: 44px; height: 44px; background: none; border: none; color: var(--dim);
+  font-size: 18px; cursor: pointer; border-radius: 100px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.bk-item-remove:hover { color: var(--danger); background: var(--hover); }
+.bk-add-item {
+  align-self: flex-start; background: none; border: 1px dashed var(--border); color: var(--sec);
+  border-radius: 100px; padding: 8px 18px; font-size: 13px; cursor: pointer; min-height: 44px;
+}
+.bk-add-item:hover { background: var(--hover); }
+.bt-delete {
+  margin-left: auto; background: none; border: none; color: var(--dim);
+  font-size: 13px; cursor: pointer; min-height: 44px; padding: 0 8px;
+}
+.bt-delete:hover { color: var(--danger); }
+.heute-book-label { color: #C58AF9; }
+
 /* ===== Mobile Bottom-Nav ===== */
 /* Auf Desktop komplett versteckt; nur ≤720 px als fixe Leiste eingeblendet. */
 .bottom-nav { display: none; }

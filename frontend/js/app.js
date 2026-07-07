@@ -21,8 +21,50 @@ const TABS = [
   { id: 'fokus', label: 'Fokus & Ziele' },
   { id: 'habits', label: 'Habit Tracker' },
   { id: 'frei', label: 'Freiheit' },
-  { id: 'challenges', label: 'Challenges' },
+  { id: 'buecher', label: 'Bücher' },
 ];
+
+// Bücher-Regal: jedes Buch bringt eigene Aufgaben mit. mode 'challenges' = feste
+// Impulse aus challenges-data.js; mode 'tasks' = Aufgaben werden beim Lesen selbst
+// festgehalten (global.bookTasks). Neue Bücher: einfach hier ergänzen.
+const BOOKS = [
+  {
+    id: 'wehrle',
+    title: 'Dieses Buch verändert dein Leben für immer',
+    author: 'Martin Wehrle',
+    emoji: '⚡',
+    color: '#FDD663',
+    mode: 'challenges',
+  },
+  {
+    id: 'stahl-kind',
+    title: 'Das Kind in dir muss Heimat finden',
+    author: 'Stefanie Stahl',
+    emoji: '🏠',
+    color: '#8AB4F8',
+    mode: 'tasks',
+    intro: 'Schattenkind, Sonnenkind & Glaubenssätze — halte die Übungen und Reflexionsfragen aus dem Buch hier fest und bearbeite sie in deinem Tempo.',
+  },
+];
+
+// Aufgaben-Typen für Bücher im mode 'tasks' — bestimmen das Antwort-Feld je Aufgabe.
+const TASK_TYPES = {
+  reflexion: {
+    label: 'Reflexionsfrage', emoji: '💭',
+    hint: 'Eine Frage aus dem Buch, die du schriftlich beantwortest.',
+    answerLabel: 'Meine Antwort', answerPh: 'Meine Antwort in Ruhe aufschreiben …',
+  },
+  liste: {
+    label: 'Liste', emoji: '📋',
+    hint: 'Sammel-Aufgabe — z. B. Glaubenssätze, Stärken oder Schutzstrategien Punkt für Punkt sammeln.',
+    answerLabel: 'Meine Einträge',
+  },
+  uebung: {
+    label: 'Übung', emoji: '🧘',
+    hint: 'Praktische oder Imaginations-Übung — Erfahrungen danach als Notiz festhalten.',
+    answerLabel: 'Meine Erfahrungen', answerPh: 'Wie ist die Übung gelaufen? Was habe ich gespürt oder gelernt?',
+  },
+};
 
 // Icon + Kurz-Label je Tab für die mobile Bottom-Nav (Reihenfolge wie TABS).
 // Icons als Inline-SVG (Material-Symbols-Stil, 24x24, currentColor) — keine Icon-Fonts/CDNs.
@@ -32,7 +74,7 @@ const NAV_ICONS = {
   fokus: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>',
   habits: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.3l2.3 2.3 4.7-4.9"/></svg>',
   frei: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15c3-6 8-9 13-9 2 0 4 1 5 2-3 1-4 3-4 5 0 3-3 6-7 6-2.5 0-4.5-1-6-2.5"/><path d="M3 15c1.5.5 3 .5 4.5 0"/></svg>',
-  challenges: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v6a6 6 0 0 1-12 0V3z"/><path d="M6 5H3a3 3 0 0 0 3 5"/><path d="M18 5h3a3 3 0 0 1-3 5"/><path d="M12 15v4"/><path d="M8 21h8"/></svg>',
+  buecher: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
 };
 const BOTTOM_NAV = {
   heute: { icon: NAV_ICONS.heute, label: 'Heute' },
@@ -40,7 +82,7 @@ const BOTTOM_NAV = {
   fokus: { icon: NAV_ICONS.fokus, label: 'Fokus' },
   habits: { icon: NAV_ICONS.habits, label: 'Habits' },
   frei: { icon: NAV_ICONS.frei, label: 'Freiheit' },
-  challenges: { icon: NAV_ICONS.challenges, label: 'Challenges' },
+  buecher: { icon: NAV_ICONS.buecher, label: 'Bücher' },
 };
 
 const JAHR_DEFAULT = 2026;
@@ -186,6 +228,10 @@ function freshGlobalDoc() {
     challenges: {},          // <id>: { done, doneAt, note } — Mini-Challenges (Wehrle)
     challengeOpen: null,     // aufgeklappte Challenge-Karte
     challengeFilter: 'alle', // 'alle' | 'offen' | 'erledigt'
+    bookOpen: null,          // geöffnetes Buch im Bücher-Tab (Buch-ID oder null = Übersicht)
+    bookTasks: {},           // <bookId>: [{ id, type, title, page, prompt, answer, items, done, doneAt, createdAt }]
+    bookTaskOpen: null,      // aufgeklappte Aufgaben-Karte
+    bookTaskFilter: 'alle',  // 'alle' | 'offen' | 'erledigt'
   };
 }
 
@@ -420,7 +466,7 @@ function selectTab(id) {
 
 // ---------- Header ----------
 function renderHeader() {
-  const showYearPicker = state.tab !== 'heute' && state.tab !== 'habits' && state.tab !== 'frei' && state.tab !== 'challenges';
+  const showYearPicker = state.tab !== 'heute' && state.tab !== 'habits' && state.tab !== 'frei' && state.tab !== 'buecher';
   refs.saveBtn = el('button', { class: 'save-chip save-chip--idle', title: 'Änderungsverlauf anzeigen', onClick: onSaveChipClick });
   const header = el('header', { class: 'header' },
     el('div', { class: 'header-left' },
@@ -629,12 +675,26 @@ function renderHeute() {
   const chState = weekCh && ((g.challenges || {})[weekCh.id] || { done: false });
   const challengeCard = weekCh && el('button', {
     class: 'card p24 heute-challenge' + (chState.done ? ' done' : ''),
-    onClick: () => selectTab('challenges'),
+    onClick: () => openBook('wehrle'),
   },
     el('div', { class: 'heute-challenge-label' }, 'AKTUELLE CHALLENGE'),
     el('div', { class: 'heute-challenge-title' }, weekCh.title),
     el('div', { class: 'heute-challenge-status' },
       chState.done ? '✓ Erledigt' : 'Noch offen — antippen zum Öffnen'),
+  );
+
+  // 4b) Bücher — nächste offene Buch-Aufgabe, bewusst dezent (nur wenn vorhanden)
+  const openBookTasks = BOOKS.filter((b) => b.mode === 'tasks')
+    .flatMap((b) => ((g.bookTasks || {})[b.id] || []).filter((t) => !t.done).map((t) => ({ b, t })));
+  const bookCard = openBookTasks.length > 0 && el('button', {
+    class: 'card p24 heute-challenge heute-book',
+    onClick: () => openBook(openBookTasks[0].b.id),
+  },
+    el('div', { class: 'heute-challenge-label heute-book-label' }, 'AUS DEINEM BUCH'),
+    el('div', { class: 'heute-challenge-title' }, openBookTasks[0].t.title),
+    el('div', { class: 'heute-challenge-status' },
+      openBookTasks[0].b.title + ' · ' + openBookTasks.length +
+      (openBookTasks.length === 1 ? ' offene Aufgabe' : ' offene Aufgaben')),
   );
 
   // 5) Dankbarkeit — dieselbe Logik wie im Frei-Tab
@@ -652,7 +712,7 @@ function renderHeute() {
   );
 
   return el('div', { class: 'heute-stack' },
-    greetCard, habitsCard, cleanCard, challengeCard, dankCard);
+    greetCard, habitsCard, cleanCard, challengeCard, bookCard, dankCard);
 }
 
 function renderDashboard() {
@@ -1487,6 +1547,278 @@ function renderFrei() {
   );
 }
 
+// ---------- Bücher (Regal + Aufgaben pro Buch) ----------
+// Übersicht → Buch antippen → Aufgaben. Wehrle = feste Mini-Challenges,
+// Task-Bücher (z. B. Stahl) = selbst festgehaltene Aufgaben mit Typ.
+let bookTaskForm = null; // transient: { type, title, page, prompt } — Formular „Neue Aufgabe“, nicht persistiert
+
+function openBook(id) {
+  setGlobal({ bookOpen: id });
+  sendEvent('book_opened', { bookId: id });
+  if (state.tab !== 'buecher') selectTab('buecher'); else render();
+}
+
+function bookBackRow() {
+  return el('button', {
+    class: 'bk-back',
+    onClick: () => { bookTaskForm = null; setGlobal({ bookOpen: null }); render(); },
+  }, '‹ Alle Bücher');
+}
+
+function bookProgress(book, g) {
+  if (book.mode === 'challenges') {
+    const all = g.challenges || {};
+    const done = CHALLENGES.filter((c) => all[c.id] && all[c.id].done).length;
+    return { done, total: CHALLENGES.length, label: done + ' / ' + CHALLENGES.length + ' Challenges erledigt' };
+  }
+  const tasks = (g.bookTasks || {})[book.id] || [];
+  const done = tasks.filter((t) => t.done).length;
+  return {
+    done, total: tasks.length,
+    label: tasks.length === 0 ? 'Noch keine Aufgaben festgehalten' : done + ' / ' + tasks.length + ' Aufgaben erledigt',
+  };
+}
+
+function renderBuecher() {
+  const g = state.global;
+  const open = BOOKS.find((b) => b.id === g.bookOpen);
+  if (open && open.mode === 'challenges') return renderChallenges();
+  if (open) return renderBookTasks(open);
+  return renderBookShelf();
+}
+
+function renderBookShelf() {
+  const g = state.global;
+  const cards = BOOKS.map((book) => {
+    const p = bookProgress(book, g);
+    return el('button', { class: 'bk-card', onClick: () => openBook(book.id) },
+      el('span', {
+        class: 'bk-cover',
+        style: 'background:linear-gradient(160deg,' + book.color + '33,' + book.color + '14);border:1px solid ' + book.color + '55;',
+      }, book.emoji),
+      el('span', { class: 'bk-card-text' },
+        el('span', { class: 'bk-card-title' }, book.title),
+        el('span', { class: 'bk-card-author' }, book.author),
+        el('span', { class: 'bk-card-progress' },
+          p.total > 0 && el('span', { class: 'bk-card-bar' },
+            el('span', { class: 'bk-card-fill', style: 'width:' + Math.round((p.done / p.total) * 100) + '%;background:' + book.color + ';' })),
+          el('span', { class: 'bk-card-label' }, p.label),
+        ),
+      ),
+      el('span', { class: 'ch-chevron' }, '›'),
+    );
+  });
+
+  return el('div', { class: 'screen', 'data-screen-label': 'Bücher' },
+    el('h2', { class: 'section-h2', style: 'margin-top:0;' }, 'Bücher'),
+    el('div', { class: 'frei-intro' }, 'Dein Arbeitsregal: Jedes Buch bringt eigene Aufgaben und Impulse mit — ein Buch antippen, um daran zu arbeiten.'),
+    el('div', { class: 'bk-shelf' }, cards),
+  );
+}
+
+function setBookTask(bookId, taskId, patch) {
+  const g = state.global;
+  const tasks = ((g.bookTasks || {})[bookId] || []).map((t) => (t.id === taskId ? { ...t, ...patch } : t));
+  setGlobal({ bookTasks: { ...(g.bookTasks || {}), [bookId]: tasks } }, 'Buch-Aufgabe aktualisiert');
+}
+
+function renderBookTasks(book) {
+  const g = state.global;
+  const tasks = (g.bookTasks || {})[book.id] || [];
+  const doneCount = tasks.filter((t) => t.done).length;
+  const filter = g.bookTaskFilter || 'alle';
+  const filtered = tasks.filter((t) => (filter === 'alle' ? true : filter === 'erledigt' ? t.done : !t.done));
+
+  function addTask() {
+    const f = bookTaskForm;
+    const title = (f.title || '').trim();
+    if (!title) return;
+    const task = {
+      id: Date.now(), type: f.type, title,
+      page: (f.page || '').trim(), prompt: (f.prompt || '').trim(),
+      answer: '', items: [], done: false, doneAt: null,
+      createdAt: new Date().toISOString().slice(0, 10),
+    };
+    const cur = (state.global.bookTasks || {})[book.id] || []; // frisch lesen, nie Closure-Stand
+    setGlobal({
+      bookTasks: { ...(state.global.bookTasks || {}), [book.id]: [...cur, task] },
+      bookTaskOpen: task.id,
+    }, 'Buch-Aufgabe hinzugefügt');
+    sendEvent('book_task_added', { bookId: book.id, taskId: task.id, type: task.type });
+    bookTaskForm = null;
+    render();
+  }
+
+  function taskForm() {
+    const f = bookTaskForm;
+    const tt = TASK_TYPES[f.type];
+    return el('div', { class: 'habit-add-card', style: 'margin-bottom:0;' },
+      el('div', { class: 'habit-add-title' }, 'Neue Aufgabe aus dem Buch'),
+      el('div', { class: 'bt-type-chips' },
+        Object.entries(TASK_TYPES).map(([id, t]) => el('button', {
+          class: 'bt-chip' + (f.type === id ? ' active' : ''),
+          onClick: () => { bookTaskForm = { ...bookTaskForm, type: id }; render(); },
+        }, t.emoji + ' ' + t.label)),
+      ),
+      el('div', { class: 'bt-type-hint' }, tt.hint),
+      el('div', { class: 'habit-grid-2', style: 'grid-template-columns:1fr 110px;' },
+        el('input', {
+          class: 'habit-input', value: f.title, placeholder: 'Titel, z. B. Meine Glaubenssätze finden',
+          onInput: (ev) => { bookTaskForm.title = ev.target.value; },
+        }),
+        el('input', {
+          class: 'habit-input', value: f.page, placeholder: 'Seite',
+          onInput: (ev) => { bookTaskForm.page = ev.target.value; },
+        }),
+      ),
+      el('textarea', {
+        class: 'habit-input', rows: 3, value: f.prompt,
+        placeholder: 'Aufgabenstellung aus dem Buch (optional) — was genau sollst du tun?',
+        onInput: (ev) => { bookTaskForm.prompt = ev.target.value; },
+      }),
+      el('div', { class: 'ch-actions', style: 'margin-top:0;' },
+        el('button', { class: 'btn-primary', onClick: addTask }, '+ Hinzufügen'),
+        el('button', { class: 'btn-ghost', onClick: () => { bookTaskForm = null; render(); } }, 'Abbrechen'),
+      ),
+    );
+  }
+
+  const addCard = bookTaskForm ? taskForm() : el('button', {
+    class: 'btn-ghost', style: 'width:100%;',
+    onClick: () => { bookTaskForm = { type: 'reflexion', title: '', page: '', prompt: '' }; render(); },
+  }, '+ Aufgabe aus dem Buch festhalten');
+
+  // Listen-Editor für Typ „liste": nummerierte Einträge, hinzufügen/entfernen.
+  // Wichtig: Einträge immer frisch aus state lesen — Feld-Commits re-rendern nicht,
+  // Closure-Stände wären beim nächsten Klick veraltet und würden Getipptes überschreiben.
+  function listEditor(t) {
+    const freshItems = () => {
+      const cur = ((state.global.bookTasks || {})[book.id] || []).find((x) => x.id === t.id);
+      return (cur && cur.items) || [];
+    };
+    const commit = (arr) => {
+      setBookTask(book.id, t.id, { items: arr });
+      sendEvent('book_task_edited', { bookId: book.id, taskId: t.id, field: 'items' });
+    };
+    return el('div', { class: 'bk-items' },
+      (t.items || []).map((it, i) => el('div', { class: 'bk-item-row' },
+        el('span', { class: 'bk-item-nr' }, (i + 1) + '.'),
+        el('input', {
+          class: 'bk-item-input', value: it, placeholder: 'Eintrag …',
+          onChange: (ev) => commit(freshItems().map((x, j) => (j === i ? ev.target.value : x))),
+        }),
+        el('button', {
+          class: 'bk-item-remove', title: 'Eintrag entfernen',
+          onClick: () => { commit(freshItems().filter((_, j) => j !== i)); render(); },
+        }, '×'),
+      )),
+      el('button', {
+        class: 'bk-add-item',
+        onClick: () => {
+          commit([...freshItems(), '']);
+          render();
+          const inputs = document.querySelectorAll('.bk-item-input');
+          if (inputs.length) inputs[inputs.length - 1].focus();
+        },
+      }, '+ Eintrag'),
+    );
+  }
+
+  function card(t) {
+    const tt = TASK_TYPES[t.type] || TASK_TYPES.reflexion;
+    const open = g.bookTaskOpen === t.id;
+
+    const head = el('button', {
+      class: 'ch-head', onClick: () => { setGlobal({ bookTaskOpen: open ? null : t.id }); render(); },
+    },
+      el('span', { class: 'ch-nr' + (t.done ? ' done' : '') }, t.done ? '✓' : tt.emoji),
+      el('span', { class: 'ch-head-text' },
+        el('span', { class: 'ch-title' }, t.title),
+        el('span', { class: 'ch-sub' }, tt.label + (t.page ? ' · Seite ' + t.page : '')),
+      ),
+      el('span', { class: 'ch-chevron' + (open ? ' open' : '') }, '›'),
+    );
+
+    const body = open && el('div', { class: 'ch-body' },
+      el('div', { class: 'bt-label' }, 'Aufgabe aus dem Buch'),
+      mdField({
+        rows: 2,
+        placeholder: 'Aufgabenstellung aus dem Buch …',
+        value: t.prompt || '',
+        title: 'Aufgabe: ' + t.title,
+        onCommit: (v) => {
+          setBookTask(book.id, t.id, { prompt: v });
+          sendEvent('book_task_edited', { bookId: book.id, taskId: t.id, field: 'prompt' });
+        },
+      }),
+      el('div', { class: 'bt-label' }, tt.answerLabel),
+      t.type === 'liste' ? listEditor(t) : mdField({
+        rows: 4,
+        placeholder: tt.answerPh,
+        value: t.answer || '',
+        title: t.title,
+        onCommit: (v) => {
+          setBookTask(book.id, t.id, { answer: v });
+          sendEvent('book_task_edited', { bookId: book.id, taskId: t.id, field: 'answer' });
+        },
+      }),
+      el('div', { class: 'ch-actions' },
+        el('button', {
+          class: t.done ? 'btn-ghost' : 'btn-primary',
+          onClick: () => {
+            const done = !t.done;
+            setBookTask(book.id, t.id, { done, doneAt: done ? new Date().toISOString().slice(0, 10) : null });
+            sendEvent('book_task_toggled', { bookId: book.id, taskId: t.id, done });
+            render();
+          },
+        }, t.done ? 'Als offen markieren' : '✓ Erledigt'),
+        t.done && t.doneAt && el('span', { class: 'ch-done-at' }, 'Erledigt am ' + new Date(t.doneAt).toLocaleDateString('de-DE')),
+        el('button', {
+          class: 'bt-delete',
+          onClick: () => {
+            const cur = (state.global.bookTasks || {})[book.id] || []; // frisch lesen, nie Closure-Stand
+            setGlobal({ bookTasks: { ...(state.global.bookTasks || {}), [book.id]: cur.filter((x) => x.id !== t.id) } }, 'Buch-Aufgabe gelöscht');
+            sendEvent('book_task_removed', { bookId: book.id, taskId: t.id });
+            render();
+          },
+        }, 'Löschen'),
+      ),
+    );
+
+    return el('div', { class: 'card ch-card' }, head, body);
+  }
+
+  const filterRow = tasks.length > 0 && el('div', { class: 'frei-subtabs', style: 'margin-bottom:0;' },
+    [['alle', 'Alle'], ['offen', 'Offen'], ['erledigt', 'Erledigt']].map(([id, label]) => el('button', {
+      class: 'frei-subtab-btn' + (filter === id ? ' active' : ''),
+      onClick: () => { setGlobal({ bookTaskFilter: id }); render(); },
+    }, label + (id === 'erledigt' ? ' (' + doneCount + ')' : ''))),
+  );
+
+  const progress = tasks.length > 0 && el('div', { class: 'ch-progress' },
+    el('div', { class: 'ch-progress-bar' }, el('div', { class: 'ch-progress-fill', style: 'width:' + Math.round((doneCount / tasks.length) * 100) + '%;' })),
+    el('span', { class: 'ch-progress-label' }, doneCount + ' / ' + tasks.length + ' erledigt'),
+  );
+
+  const empty = tasks.length === 0 && !bookTaskForm && emptyState('📖',
+    'Noch keine Aufgaben festgehalten',
+    'Wenn dir beim Lesen eine Übung oder Reflexionsfrage begegnet, halte sie hier fest — mit passendem Typ, damit du sie direkt bearbeiten kannst.',
+    '+ Erste Aufgabe festhalten',
+    () => { bookTaskForm = { type: 'reflexion', title: '', page: '', prompt: '' }; render(); });
+
+  return el('div', { class: 'screen', 'data-screen-label': book.title },
+    bookBackRow(),
+    el('h2', { class: 'section-h2', style: 'margin-top:0;' }, book.title),
+    el('div', { class: 'frei-intro' }, book.intro || ('Aufgaben aus »' + book.title + '« (' + book.author + ').')),
+    progress,
+    empty || el('div', { class: 'bk-stack' },
+      tasks.length > 0 ? addCard : (bookTaskForm ? taskForm() : null),
+      filterRow,
+      el('div', { class: 'ch-list', style: 'margin-top:0;' }, filtered.map(card)),
+    ),
+  );
+}
+
 // ---------- Mini-Challenges (Martin Wehrle, 52 Impulse) ----------
 // Aktuelle Challenge = erste noch nicht erledigte in Reihenfolge (kein Kalenderwochen-Bezug).
 function currentChallengeId(g) {
@@ -1592,6 +1924,7 @@ function renderChallenges() {
   );
 
   return el('div', { class: 'screen', 'data-screen-label': 'Mini-Challenges' },
+    bookBackRow(),
     el('h2', { class: 'section-h2', style: 'margin-top:0;' }, 'Mini-Challenges'),
     el('div', { class: 'frei-intro' }, '52 Impulse aus »Dieses Buch verändert dein Leben für immer« (Martin Wehrle). Eine nach der anderen im eigenen Tempo — klein anfangen, groß wirken.'),
     heroCard(),
@@ -2028,7 +2361,7 @@ function render() {
       : state.tab === 'dashboard' ? renderDashboard()
       : state.tab === 'fokus' ? renderFokus()
       : state.tab === 'habits' ? renderHabits()
-      : state.tab === 'challenges' ? renderChallenges()
+      : state.tab === 'buecher' ? renderBuecher()
       : renderFrei(),
   );
   root.replaceChildren(renderHeader(), main, renderBottomNav());
@@ -2055,7 +2388,8 @@ function renderBoot(text, isError, retry) {
 async function init() {
   const p = loadPrefs();
   state.year = Number(p.year) || JAHR_DEFAULT;
-  state.tab = TABS.some((t) => t.id === p.tab) ? p.tab : 'heute';
+  const prefTab = p.tab === 'challenges' ? 'buecher' : p.tab; // alter Tab „Challenges" lebt jetzt im Bücher-Regal
+  state.tab = TABS.some((t) => t.id === prefTab) ? prefTab : 'heute';
   renderBoot('Lade Daten …');
   try {
     const [doc, uilog, global] = await Promise.all([
