@@ -250,6 +250,9 @@ function freshFrei() {
   return {
     log: {}, urges: [], diary: {}, dank: {},
     inner: '', middle: '', outer: '', bookend: '', beast: '', kosten: '', gewinn: '',
+    why: { hurt: '', morning: '', future: '', ripple: '' }, // geführte Warum-Fragen
+    letter: '',   // Brief an mein Drang-Ich (erscheint in Sieg-/Nachgegeben-Overlay)
+    values: [],   // ausgewählte Werte-Anker (Chips)
   };
 }
 
@@ -917,6 +920,13 @@ const FREI_SUBTABS = [
   { id: 'urge', label: '⚡ Urge-Tracker' },
   { id: 'generell', label: '🧭 Generell' },
 ];
+// Werte-Anker für „Mein Warum" (antippbare Chips)
+const WHY_VALUES = [
+  'Nähe zu meiner Frau', 'Ehrlichkeit', 'Selbstrespekt', 'Klarer Kopf',
+  'Präsenz', 'Vertrauen', 'Energie für meine Ziele', 'Freiheit',
+  'Stolz', 'Ruhiger Schlaf', 'Echte Verbindung', 'Selbstkontrolle',
+  'Vorbild sein', 'Zeit', 'Innerer Frieden', 'Disziplin',
+];
 const HALT_ITEMS = [
   { k: 'h', label: 'Hungry — hungrig?' },
   { k: 'a', label: 'Angry — wütend?' },
@@ -1382,7 +1392,11 @@ function renderFreiUrge() {
     openBtn,
     form,
     (!d && state.urgeGaveNote) && el('div', { class: 'card frei-gave-note' },
-      'Eingetragen. Ein Ausrutscher ist ein Datenpunkt, kein Urteil.'),
+      el('div', {}, 'Eingetragen. Ein Ausrutscher ist ein Datenpunkt, kein Urteil.'),
+      (() => {
+        const card = whyLetterCard();
+        return card ? el('div', { class: 'frei-gave-why' }, card) : null;
+      })()),
     el('div', { class: 'frei-urge-history-title' }, 'Gemeldete Urges'),
     urgeList,
   );
@@ -1419,19 +1433,97 @@ function renderFreiGenerell() {
     ),
   );
 
-  const warumCard = el('div', { class: 'card p24' },
-    el('div', { class: 'frei-card-title' }, 'Mein Warum — in meinen eigenen Worten'),
-    el('div', { class: 'frei-card-sub' }, 'Deine eigenen Gründe wirken stärker als jede fremde Liste. Schreib konkret und ehrlich.'),
-    el('div', { class: 'frei-grid-2' },
-      field('WAS ES MICH WIRKLICH KOSTET', '#F28B82', 'z. B. Distanz zu meiner Frau, Brain Fog, verschwendete Abende, Scham am nächsten Morgen …', 'kosten', 5),
-      field('WAS ICH ZURÜCKGEWINNE', '#81C995', 'z. B. echte Nähe zu meiner Frau, klarer Kopf, Selbstrespekt, Zeit und Energie für meine Ziele …', 'gewinn', 5),
-    ),
-    el('div', { class: 'frei-bookend' },
-      field('DAS „BEAST" ENTLARVEN — DIE SUCHTSTIMME BIN NICHT ICH', '#8AB4F8', 'Welche Lügen erzählt dir die Suchtstimme? ("Nur einmal noch", "Du hast es verdient", "Es merkt ja keiner") — und was ist die rationale Antwort darauf?', 'beast', 4),
+  // ---- Werte-Anker (Chips) ----
+  const selValues = Array.isArray(F.values) ? F.values : [];
+  const toggleValue = (v) => {
+    const next = selValues.includes(v) ? selValues.filter((x) => x !== v) : [...selValues, v];
+    setFrei({ values: next }, 'Werte-Anker bearbeitet');
+    sendEvent('frei_field_edited', { field: 'values' });
+    render();
+  };
+  const valuesCard = el('div', { class: 'card p24' },
+    el('div', { class: 'frei-card-title' }, 'Wofür ich das tue — meine Werte'),
+    el('div', { class: 'frei-card-sub' }, 'Tippe an, was dir wirklich wichtig ist. Diese Anker erinnern dich im Drang daran, worum es eigentlich geht.'),
+    el('div', { class: 'frei-chips' },
+      WHY_VALUES.map((v) => el('button', {
+        class: 'frei-chip' + (selValues.includes(v) ? ' active' : ''),
+        onClick: () => toggleValue(v),
+      }, v)),
     ),
   );
 
-  return el('div', {}, renderFreiStats(), circlesCard, warumCard);
+  // ---- Kosten ↔ Gewinn als Waage ----
+  const scaleCard = el('div', { class: 'card p24' },
+    el('div', { class: 'frei-card-title' }, 'Die Waage — was ich verliere gegen was ich gewinne'),
+    el('div', { class: 'frei-card-sub' }, 'Zwei Seiten derselben Entscheidung. Schreib beide ehrlich voll — im Drang liest du hier, was auf dem Spiel steht.'),
+    el('div', { class: 'frei-scale' },
+      el('div', { class: 'frei-scale-pan cost' },
+        el('div', { class: 'frei-scale-head' }, '⬇ Was mich Nachgeben kostet'),
+        mdField({
+          rows: 5, value: F.kosten || '',
+          placeholder: 'z. B. Distanz zu meiner Frau, Brain Fog, verschwendete Abende, Scham am nächsten Morgen …',
+          title: 'Was mich Nachgeben kostet',
+          onCommit: (v) => { setFrei({ kosten: v }, 'Freiheit & Kontrolle bearbeitet'); sendEvent('frei_field_edited', { field: 'kosten' }); },
+        }),
+      ),
+      el('div', { class: 'frei-scale-vs' }, 'vs.'),
+      el('div', { class: 'frei-scale-pan gain' },
+        el('div', { class: 'frei-scale-head' }, '⬆ Was ich zurückgewinne'),
+        mdField({
+          rows: 5, value: F.gewinn || '',
+          placeholder: 'z. B. echte Nähe zu meiner Frau, klarer Kopf, Selbstrespekt, Zeit und Energie für meine Ziele …',
+          title: 'Was ich zurückgewinne',
+          onCommit: (v) => { setFrei({ gewinn: v }, 'Freiheit & Kontrolle bearbeitet'); sendEvent('frei_field_edited', { field: 'gewinn' }); },
+        }),
+      ),
+    ),
+  );
+
+  // ---- Geführte Warum-Fragen ----
+  const why = (F.why && typeof F.why === 'object') ? F.why : {};
+  const whyField = (label, key, placeholder) => el('div', { class: 'frei-why-q' },
+    el('div', { class: 'frei-why-q-label' }, label),
+    mdField({
+      rows: 2, value: why[key] || '', placeholder, title: label,
+      onCommit: (v) => {
+        setFrei({ why: { ...why, [key]: v } }, 'Warum-Frage beantwortet');
+        sendEvent('frei_field_edited', { field: 'why.' + key });
+      },
+    }),
+  );
+  const questionsCard = el('div', { class: 'card p24' },
+    el('div', { class: 'frei-card-title' }, 'Wenn der Drang kommt — frag dich das'),
+    el('div', { class: 'frei-card-sub' }, 'Konkrete Fragen wirken stärker als ein leeres Feld. Beantworte sie jetzt, in Ruhe — dann sind die Antworten da, wenn du sie brauchst.'),
+    whyField('Wer wird verletzt, wenn ich nachgebe — und wie merkt diese Person es?', 'hurt',
+      'z. B. Meine Frau spürt die Distanz, auch wenn sie nicht weiß warum …'),
+    whyField('Wie fühle ich mich morgen früh, wenn ich heute widerstanden habe?', 'morning',
+      'z. B. Stolz, klar im Kopf, ich kann ihr in die Augen sehen …'),
+    whyField('Was möchte mein Ich in 5 Jahren, dass ich jetzt tue?', 'future',
+      'z. B. dass ich diesen Kampf ernst genommen und durchgezogen habe …'),
+    whyField('Ein „nur einmal" — was löst es in Wahrheit aus?', 'ripple',
+      'z. B. Es startet den ganzen Kreislauf neu: Scham, Verstecken, nächster Drang …'),
+  );
+
+  // ---- Brief an mein Drang-Ich ----
+  const letterCard = el('div', { class: 'card p24 frei-letter-card' },
+    el('div', { class: 'frei-card-title' }, '✉️ Brief an mein Drang-Ich'),
+    el('div', { class: 'frei-card-sub' }, 'Schreib deinem schwächsten Moment eine Nachricht aus einem starken. Dieser Brief erscheint automatisch, wenn du einen Urge einträgst — beim Widerstehen und beim Nachgeben.'),
+    mdField({
+      rows: 6, value: F.letter || '',
+      placeholder: 'z. B. Hey. Wenn du das liest, ist es gerade schwer. Aber du kennst das Gefühl danach — und das willst du nicht. Atme. Steh auf. Ruf sie an. In 20 Minuten ist der Drang vorbei und du bist stolz. Ich glaube an dich.',
+      title: 'Brief an mein Drang-Ich',
+      onCommit: (v) => { setFrei({ letter: v }, 'Brief ans Drang-Ich bearbeitet'); sendEvent('frei_field_edited', { field: 'letter' }); },
+    }),
+  );
+
+  // ---- Beast entlarven (bleibt als eigenes Feld) ----
+  const beastCard = el('div', { class: 'card p24' },
+    el('div', { class: 'frei-card-title' }, 'Das „Beast" entlarven'),
+    el('div', { class: 'frei-card-sub' }, 'Die Suchtstimme bin nicht ich. Schreib ihre Lügen auf — und deine rationale Antwort darauf.'),
+    field('DIE LÜGE → MEINE ANTWORT', '#8AB4F8', '("Nur einmal noch" → Es gibt kein einmal. / "Du hast es verdient" → Ich verdiene Selbstrespekt, nicht das.)', 'beast', 4),
+  );
+
+  return el('div', {}, renderFreiStats(), circlesCard, valuesCard, scaleCard, questionsCard, letterCard, beastCard);
 }
 
 // Statistik-Karten für Freiheit → generell. Rein lesend aus global.frei — speichert nichts.
@@ -2327,21 +2419,26 @@ function renderOverlay() {
   document.getElementById('app').append(refs.overlay);
 }
 
+// Gemeinsame „Dein Warum"-Karte für Sieg-Overlay + Nachgegeben-Karte.
+// Zeigt den Brief ans Drang-Ich; fällt auf „Gewinn" zurück, falls noch kein Brief geschrieben.
+function whyLetterCard() {
+  const F = state.global.frei || {};
+  const text = ((F.letter || '').trim()) || ((F.gewinn || '').trim());
+  if (!text) return null;
+  const body = el('div', { class: 'urge-win-why-text' });
+  body.innerHTML = mdToHtml(text);
+  return el('div', { class: 'card urge-win-why' },
+    el('div', { class: 'urge-win-why-head' }, F.letter && F.letter.trim() ? 'Brief an dich:' : 'Dein Warum:'),
+    body,
+  );
+}
+
 // Sieg-Overlay nach „Widerstanden" — reines UI, speichert nichts.
 function renderUrgeCelebration() {
   const c = state.urgeCelebration;
   if (!c) return null;
   const close = () => { state.urgeCelebration = null; render(); };
-  const gewinn = ((state.global.frei && state.global.frei.gewinn) || '').trim();
-  let whyCard = null;
-  if (gewinn) {
-    const whyText = el('div', { class: 'urge-win-why-text' });
-    whyText.innerHTML = mdToHtml(gewinn);
-    whyCard = el('div', { class: 'card urge-win-why' },
-      el('div', { class: 'urge-win-why-head' }, 'Dein Warum:'),
-      whyText,
-    );
-  }
+  const whyCard = whyLetterCard();
   return el('div', { class: 'urge-win-overlay', 'data-screen-label': 'Sieg' },
     el('div', { class: 'urge-win-inner' },
       el('div', { class: 'urge-win-title' }, 'Du hast widerstanden 💪'),

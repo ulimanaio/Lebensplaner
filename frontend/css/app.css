@@ -357,6 +357,46 @@ main { max-width: 1180px; margin: 0 auto; padding: clamp(16px, 4vw, 32px) clamp(
 .frei-bookend { margin-top: 16px; }
 .link-btn { background: none; border: none; color: var(--accent); font-size: inherit; font-weight: 500; cursor: pointer; padding: 0; text-decoration: underline; }
 
+/* Mein Warum — Werte-Chips */
+.frei-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.frei-chip {
+  background: var(--inset); color: var(--sec); border: 1px solid var(--border);
+  border-radius: 100px; padding: 8px 14px; cursor: pointer;
+  font-family: var(--font-display); font-size: 13px; font-weight: 500;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.frei-chip:hover { filter: brightness(1.15); }
+.frei-chip.active { background: var(--accent); color: #131314; border-color: var(--accent); }
+
+/* Mein Warum — Kosten/Gewinn-Waage */
+.frei-scale { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: stretch; }
+.frei-scale-pan { border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+.frei-scale-pan.cost { border-top: 3px solid #F28B82; }
+.frei-scale-pan.gain { border-top: 3px solid #81C995; }
+.frei-scale-head { font-size: 12px; font-weight: 600; letter-spacing: .4px; margin-bottom: 10px; }
+.frei-scale-pan.cost .frei-scale-head { color: #F28B82; }
+.frei-scale-pan.gain .frei-scale-head { color: #81C995; }
+.frei-scale-vs {
+  align-self: center; font-family: var(--font-display); font-size: 13px; font-weight: 600;
+  color: var(--mut); text-transform: uppercase; letter-spacing: .08em;
+}
+@media (max-width: 560px) {
+  .frei-scale { grid-template-columns: 1fr; }
+  .frei-scale-vs { padding: 2px 0; }
+}
+
+/* Mein Warum — geführte Fragen */
+.frei-why-q { margin-bottom: 16px; }
+.frei-why-q:last-child { margin-bottom: 0; }
+.frei-why-q-label {
+  font-size: 13px; font-weight: 500; color: var(--title);
+  line-height: 1.45; margin-bottom: 8px;
+}
+
+/* Mein Warum — Brief ans Drang-Ich */
+.frei-letter-card { border-left: 3px solid var(--accent); }
+.frei-gave-why { margin-top: 12px; }
+
 /* Statistiken */
 .frei-stats-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

@@ -47,7 +47,10 @@ Bereich-IDs (`AREAS` in app.js): `koerper, soziales, liebe, finanzen, karriere, 
     diary: { "YYYY-MM-DD": "Text" },
     dank:  { "YYYY-MM-DD": "Text" },
     inner, middle, outer, bookend,      // 3-Kreise-Modell + Bookending
-    beast, kosten, gewinn,              // „Mein Warum“
+    beast, kosten, gewinn,              // „Mein Warum”: beast=Suchtstimme entlarven; kosten/gewinn=Waage
+    why: { hurt, morning, future, ripple }, // geführte Warum-Fragen (je 1 Antworttext)
+    letter,                             // Brief ans Drang-Ich (erscheint in Sieg- + Nachgegeben-Overlay; Fallback: gewinn)
+    values: [“Nähe zu meiner Frau”, …], // ausgewählte Werte-Anker-Chips (aus WHY_VALUES)
   },
 }
 ```
