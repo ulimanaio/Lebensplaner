@@ -40,6 +40,9 @@ Bereich-IDs (`AREAS` in app.js): `koerper, soziales, liebe, finanzen, karriere, 
   bookTasks: { <bookId>: [{ id, type: "reflexion"|"liste"|"uebung", title, page, prompt,
     answer, items: ["…"], done, doneAt, createdAt }] },  // selbst festgehaltene Aufgaben je Task-Buch (z. B. "stahl-kind")
   bookTaskOpen: <id>|null, bookTaskFilter: "alle"|"offen"|"erledigt",
+  bookNotes: { <bookId>: [{ id, type: "gedanke"|"aha"|"zitat"|"bezug"|"todo", chapter, text,
+    done, doneAt, createdAt }] },       // Hörbuch-Notizen je Notes-Buch (z. B. "stahl-selbstwert"), neueste zuerst
+  bookNoteOpen: <id>|null, bookNoteFilter: "alle"|"todo-offen"|"aha"|"zitat"|"bezug",
   frei: {                               // Tab „Freiheit & Kontrolle“
     log:   { "YYYY-MM-DD": "clean" | "fall" },
     urges: [{ id, date, time, outcome: "res"|"gave", intensity: 1–10,
@@ -80,6 +83,7 @@ book_opened, book_task_added, book_task_edited, book_task_toggled, book_task_rem
 | Freiheit & Kontrolle | `renderFrei` + `renderFreiTagebuch` / `renderFreiUrge` / `renderFreiGenerell` (enthält `renderFreiStats`: Heatmap/Sieg-Quote/Muster, rein lesend, speichert nichts) |
 | Habit Tracker | `renderHabits`, `pressHandlers` (Long-Press), `renderCommentSheet` |
 | Bücher (Tab, Regal + Buch-Aufgaben) | `renderBuecher`, `renderBookShelf`, `renderBookTasks`, `setBookTask`, `openBook`; Buch-Registry `BOOKS` + Aufgaben-Typen `TASK_TYPES` am Dateianfang — neue Bücher dort ergänzen |
+| Hörbuch-Notizen (Bücher im mode `notes`, z. B. Stahl »Leben kann auch einfach sein!«) | `renderBookNotes`, `setBookNote`; Notiz-Typen `NOTE_TYPES` + Kapitel-Liste am Buch (`chapters`) am Dateianfang |
 | Mini-Challenges (Wehrle-Buch im Bücher-Tab) | `renderChallenges`, `setChallenge`, `isoWeek`; statische Daten in `frontend/js/challenges-data.js` (52 Einträge aus Wehrle-Buch, `Sources/`) |
 | Verlauf-Drawer | `renderOverlay`, `openLog` |
 | Boot/Init | `init`, `renderBoot` |

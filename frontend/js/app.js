@@ -45,7 +45,42 @@ const BOOKS = [
     mode: 'tasks',
     intro: 'Schattenkind, Sonnenkind & Glaubenssätze — halte die Übungen und Reflexionsfragen aus dem Buch hier fest und bearbeite sie in deinem Tempo.',
   },
+  {
+    id: 'stahl-selbstwert',
+    title: 'Leben kann auch einfach sein!',
+    author: 'Stefanie Stahl',
+    emoji: '🌱',
+    color: '#81C995',
+    mode: 'notes',
+    intro: 'Hörbuch-Begleiter: Kapitel wählen, Typ antippen, Gedanken sofort festhalten — Kapitel und Typ bleiben für die nächste Notiz stehen.',
+    chapters: [
+      'Prolog',
+      'Bewusst selbst sein',
+      'Was bewirkt ein geringes Selbstwertgefühl?',
+      'Auswirkungen auf das Miteinander',
+      'Die Stärken von selbstunsicheren Menschen',
+      'Warum bin ich nur so unsicher? (Ursachen)',
+      'Das innere Kind',
+      'So werde ich selbstbewusster: Selbstannahme',
+      'Finden Sie zu sich selbst!',
+      'Kommunikation',
+      'Handeln',
+      'Fühlen',
+      'Wie Sie Ihr Leben verändern — Übungen',
+      'Test & Tipps: Intro- und Extraversion',
+      'Epilog',
+    ],
+  },
 ];
+
+// Notiz-Typen für Bücher im mode 'notes' (Hörbuch-Begleiter) — schnelle Einordnung beim Hören.
+const NOTE_TYPES = {
+  gedanke: { label: 'Gedanke', emoji: '💭', ph: 'Was geht dir gerade durch den Kopf?' },
+  aha:     { label: 'Aha-Moment', emoji: '⚡', ph: 'Was hat gerade Klick gemacht?' },
+  zitat:   { label: 'Zitat', emoji: '📌', ph: 'Satz aus dem Buch, den du behalten willst …' },
+  bezug:   { label: 'Ich-Bezug', emoji: '🪞', ph: 'Wo erkennst du dich wieder? Welche Situation fällt dir ein?' },
+  todo:    { label: 'Umsetzen', emoji: '✅', ph: 'Übung oder Vorsatz, den du ausprobieren willst …' },
+};
 
 // Aufgaben-Typen für Bücher im mode 'tasks' — bestimmen das Antwort-Feld je Aufgabe.
 const TASK_TYPES = {
@@ -953,6 +988,10 @@ function renderFreiTagebuch() {
   const log = F.log || {};
   const urges = F.urges || [];
   const today = isoOf(new Date());
+  // Nach einem Tageswechsel (00:00) immer automatisch auf den aktuellen Tag springen,
+  // damit keine Einträge versehentlich beim gestrigen Datum landen. Zurückblättern in der
+  // Vergangenheit bleibt möglich; über Mitternacht hinweg wird die Auswahl wieder auf heute gesetzt.
+  if (g.freiSelDate && g.freiSelDate < today) g.freiSelDate = today;
   const selDate = g.freiSelDate || today;
   const dayMs = 86400000;
 
@@ -1643,6 +1682,7 @@ function renderFrei() {
 // Übersicht → Buch antippen → Aufgaben. Wehrle = feste Mini-Challenges,
 // Task-Bücher (z. B. Stahl) = selbst festgehaltene Aufgaben mit Typ.
 let bookTaskForm = null; // transient: { type, title, page, prompt } — Formular „Neue Aufgabe“, nicht persistiert
+let bookNoteDraft = null; // transient: { type, chapter, text } — Schnell-Erfassung im Notiz-Modus; Typ+Kapitel bleiben nach dem Speichern stehen
 
 function openBook(id) {
   setGlobal({ bookOpen: id });
@@ -1653,7 +1693,7 @@ function openBook(id) {
 function bookBackRow() {
   return el('button', {
     class: 'bk-back',
-    onClick: () => { bookTaskForm = null; setGlobal({ bookOpen: null }); render(); },
+    onClick: () => { bookTaskForm = null; bookNoteDraft = null; setGlobal({ bookOpen: null }); render(); },
   }, '‹ Alle Bücher');
 }
 
@@ -1662,6 +1702,15 @@ function bookProgress(book, g) {
     const all = g.challenges || {};
     const done = CHALLENGES.filter((c) => all[c.id] && all[c.id].done).length;
     return { done, total: CHALLENGES.length, label: done + ' / ' + CHALLENGES.length + ' Challenges erledigt' };
+  }
+  if (book.mode === 'notes') {
+    const notes = (g.bookNotes || {})[book.id] || [];
+    const openTodos = notes.filter((n) => n.type === 'todo' && !n.done).length;
+    return {
+      done: 0, total: 0,
+      label: notes.length === 0 ? 'Noch keine Notizen'
+        : notes.length + ' Notiz' + (notes.length === 1 ? '' : 'en') + (openTodos > 0 ? ' · ' + openTodos + ' offen umzusetzen' : ''),
+    };
   }
   const tasks = (g.bookTasks || {})[book.id] || [];
   const done = tasks.filter((t) => t.done).length;
@@ -1675,6 +1724,7 @@ function renderBuecher() {
   const g = state.global;
   const open = BOOKS.find((b) => b.id === g.bookOpen);
   if (open && open.mode === 'challenges') return renderChallenges();
+  if (open && open.mode === 'notes') return renderBookNotes(open);
   if (open) return renderBookTasks(open);
   return renderBookShelf();
 }
@@ -1907,6 +1957,144 @@ function renderBookTasks(book) {
       tasks.length > 0 ? addCard : (bookTaskForm ? taskForm() : null),
       filterRow,
       el('div', { class: 'ch-list', style: 'margin-top:0;' }, filtered.map(card)),
+    ),
+  );
+}
+
+// ---------- Hörbuch-Notizen (Bücher im mode 'notes') ----------
+// Schnell-Erfassung oben (immer sichtbar), Verlauf darunter (neueste zuerst).
+// Kapitel und Typ bleiben nach dem Speichern stehen — beim Hören notiert man
+// meist mehrere Gedanken hintereinander im selben Kapitel.
+function setBookNote(bookId, noteId, patch) {
+  const g = state.global;
+  const notes = ((g.bookNotes || {})[bookId] || []).map((n) => (n.id === noteId ? { ...n, ...patch } : n));
+  setGlobal({ bookNotes: { ...(g.bookNotes || {}), [bookId]: notes } }, 'Buch-Notiz aktualisiert');
+}
+
+function renderBookNotes(book) {
+  const g = state.global;
+  const notes = (g.bookNotes || {})[book.id] || [];
+  if (!bookNoteDraft) bookNoteDraft = { type: 'gedanke', chapter: '', text: '' };
+  const draft = bookNoteDraft;
+  const filter = g.bookNoteFilter || 'alle';
+  const filtered = notes.filter((n) => (filter === 'alle' ? true : filter === 'todo-offen' ? (n.type === 'todo' && !n.done) : n.type === filter));
+
+  function chapterSelect(value, onChange, extraClass) {
+    return el('select', {
+      class: 'habit-input bn-chapter' + (extraClass || ''),
+      onChange: (ev) => onChange(ev.target.value),
+    },
+      el('option', { value: '', selected: value === '' || null }, 'Kapitel (optional)'),
+      (book.chapters || []).map((c) => el('option', { value: c, selected: value === c || null }, c)),
+    );
+  }
+
+  function saveNote() {
+    const text = (draft.text || '').trim();
+    if (!text) return;
+    const note = {
+      id: Date.now(), type: draft.type, chapter: draft.chapter, text,
+      done: false, doneAt: null, createdAt: new Date().toISOString(),
+    };
+    const cur = (state.global.bookNotes || {})[book.id] || []; // frisch lesen, nie Closure-Stand
+    setGlobal({ bookNotes: { ...(state.global.bookNotes || {}), [book.id]: [note, ...cur] } }, 'Buch-Notiz gespeichert');
+    sendEvent('book_note_added', { bookId: book.id, noteId: note.id, type: note.type, chapter: note.chapter });
+    bookNoteDraft = { ...draft, text: '' }; // Kapitel + Typ stehen lassen
+    render();
+    const ta = document.querySelector('.bn-capture textarea');
+    if (ta) ta.focus();
+  }
+
+  const nt = NOTE_TYPES[draft.type];
+  const capture = el('div', { class: 'habit-add-card bn-capture', style: 'margin-bottom:0;' },
+    chapterSelect(draft.chapter, (v) => { bookNoteDraft.chapter = v; }),
+    el('div', { class: 'bt-type-chips' },
+      Object.entries(NOTE_TYPES).map(([id, t]) => el('button', {
+        class: 'bt-chip' + (draft.type === id ? ' active' : ''),
+        onClick: () => { bookNoteDraft = { ...bookNoteDraft, type: id }; render(); },
+      }, t.emoji + ' ' + t.label)),
+    ),
+    el('textarea', {
+      class: 'habit-input', rows: 3, value: draft.text, placeholder: nt.ph,
+      onInput: (ev) => { bookNoteDraft.text = ev.target.value; },
+      onKeyDown: (ev) => { if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) { bookNoteDraft.text = ev.target.value; saveNote(); } },
+    }),
+    el('button', { class: 'btn-primary', style: 'width:100%;', onClick: saveNote }, nt.emoji + ' Notiz speichern'),
+  );
+
+  function noteCard(n) {
+    const t = NOTE_TYPES[n.type] || NOTE_TYPES.gedanke;
+    const open = g.bookNoteOpen === n.id;
+    const when = new Date(n.createdAt).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const firstLine = (n.text || '').split('\n')[0];
+
+    const head = el('button', {
+      class: 'ch-head', onClick: () => { setGlobal({ bookNoteOpen: open ? null : n.id }); render(); },
+    },
+      el('span', { class: 'ch-nr' + (n.type === 'todo' && n.done ? ' done' : '') }, n.type === 'todo' && n.done ? '✓' : t.emoji),
+      el('span', { class: 'ch-head-text' },
+        el('span', { class: 'ch-title bn-note-title' }, firstLine),
+        el('span', { class: 'ch-sub' }, t.label + (n.chapter ? ' · ' + n.chapter : '') + ' · ' + when),
+      ),
+      el('span', { class: 'ch-chevron' + (open ? ' open' : '') }, '›'),
+    );
+
+    const body = open && el('div', { class: 'ch-body' },
+      mdField({
+        rows: 3, placeholder: t.ph, value: n.text || '', title: t.label,
+        onCommit: (v) => {
+          setBookNote(book.id, n.id, { text: v });
+          sendEvent('book_note_edited', { bookId: book.id, noteId: n.id });
+        },
+      }),
+      el('div', { class: 'bt-label' }, 'Kapitel'),
+      chapterSelect(n.chapter || '', (v) => { setBookNote(book.id, n.id, { chapter: v }); render(); }),
+      el('div', { class: 'ch-actions' },
+        n.type === 'todo' && el('button', {
+          class: n.done ? 'btn-ghost' : 'btn-primary',
+          onClick: () => {
+            const done = !n.done;
+            setBookNote(book.id, n.id, { done, doneAt: done ? new Date().toISOString().slice(0, 10) : null });
+            sendEvent('book_note_toggled', { bookId: book.id, noteId: n.id, done });
+            render();
+          },
+        }, n.done ? 'Als offen markieren' : '✓ Umgesetzt'),
+        el('button', {
+          class: 'bt-delete',
+          onClick: () => {
+            const cur = (state.global.bookNotes || {})[book.id] || []; // frisch lesen, nie Closure-Stand
+            setGlobal({ bookNotes: { ...(state.global.bookNotes || {}), [book.id]: cur.filter((x) => x.id !== n.id) } }, 'Buch-Notiz gelöscht');
+            sendEvent('book_note_removed', { bookId: book.id, noteId: n.id });
+            render();
+          },
+        }, 'Löschen'),
+      ),
+    );
+
+    return el('div', { class: 'card ch-card' }, head, body);
+  }
+
+  const openTodos = notes.filter((n) => n.type === 'todo' && !n.done).length;
+  const filterRow = notes.length > 0 && el('div', { class: 'frei-subtabs', style: 'margin-bottom:0;' },
+    [['alle', 'Alle (' + notes.length + ')'],
+     ['todo-offen', '✅ Offen' + (openTodos > 0 ? ' (' + openTodos + ')' : '')],
+     ['aha', '⚡ Aha'], ['zitat', '📌 Zitate'], ['bezug', '🪞 Ich']].map(([id, label]) => el('button', {
+      class: 'frei-subtab-btn' + (filter === id ? ' active' : ''),
+      onClick: () => { setGlobal({ bookNoteFilter: id }); render(); },
+    }, label)),
+  );
+
+  return el('div', { class: 'screen', 'data-screen-label': book.title },
+    bookBackRow(),
+    el('h2', { class: 'section-h2', style: 'margin-top:0;' }, book.title),
+    el('div', { class: 'frei-intro' }, book.intro),
+    el('div', { class: 'bk-stack' },
+      capture,
+      filterRow,
+      notes.length === 0
+        ? el('div', { class: 'frei-intro', style: 'text-align:center;' }, '🎧 Drück Play und halte oben fest, was hängen bleibt — jede Notiz landet hier im Verlauf.')
+        : el('div', { class: 'ch-list', style: 'margin-top:0;' },
+            filtered.length === 0 ? el('div', { class: 'frei-intro' }, 'Keine Notizen in diesem Filter.') : filtered.map(noteCard)),
     ),
   );
 }
@@ -2502,6 +2690,37 @@ async function init() {
     return;
   }
   render();
+  scheduleMidnightRefresh();
 }
+
+// Beim Tageswechsel (00:00) neu rendern, damit die Freiheit-Tagesauswahl auch bei
+// dauerhaft geöffneter App automatisch auf den neuen Tag springt (siehe renderFreiTagebuch).
+function scheduleMidnightRefresh() {
+  const now = new Date();
+  const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5, 0);
+  setTimeout(() => {
+    const g = state.global;
+    if (g) {
+      const today = isoOf(new Date());
+      if (g.freiSelDate && g.freiSelDate < today) g.freiSelDate = today;
+      // Kalenderansicht auf den aktuellen Monat nachziehen, falls sie noch auf gestern steht
+      const nowD = new Date();
+      if (g.freiCalYear === now.getFullYear() && g.freiCalMonth === now.getMonth()) {
+        g.freiCalYear = nowD.getFullYear();
+        g.freiCalMonth = nowD.getMonth();
+      }
+      render();
+    }
+    scheduleMidnightRefresh();
+  }, Math.max(1000, nextMidnight.getTime() - now.getTime()));
+}
+
+// Beim Zurückkehren zur App (z. B. Handy morgens entsperren) sofort prüfen, ob ein Tageswechsel
+// stattgefunden hat — der setTimeout oben feuert bei ausgesetzten/gethrottelten Tabs evtl. nicht.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !state.global) return;
+  const today = isoOf(new Date());
+  if (state.global.freiSelDate && state.global.freiSelDate < today) render();
+});
 
 init();

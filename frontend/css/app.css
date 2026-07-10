@@ -825,6 +825,18 @@ main { max-width: 1180px; margin: 0 auto; padding: clamp(16px, 4vw, 32px) clamp(
   color: var(--mut); margin: 16px 0 6px;
 }
 .ch-body .bt-label:first-child { margin-top: 0; }
+
+/* Hörbuch-Notizen (Bücher im mode 'notes') */
+.bn-capture { display: flex; flex-direction: column; gap: 10px; }
+.bn-chapter {
+  width: 100%; appearance: none; -webkit-appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%239aa0a6' stroke-width='2' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px;
+}
+.bn-note-title {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; text-overflow: ellipsis; white-space: normal;
+}
 .bk-items { display: flex; flex-direction: column; gap: 8px; }
 .bk-item-row { display: flex; align-items: center; gap: 8px; }
 .bk-item-nr { flex: none; min-width: 20px; font-size: 13px; color: var(--dim); text-align: right; }
