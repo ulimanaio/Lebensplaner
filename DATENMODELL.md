@@ -43,6 +43,9 @@ Bereich-IDs (`AREAS` in app.js): `koerper, soziales, liebe, finanzen, karriere, 
   bookNotes: { <bookId>: [{ id, type: "gedanke"|"aha"|"zitat"|"bezug"|"todo", chapter, text,
     done, doneAt, createdAt }] },       // Hörbuch-Notizen je Notes-Buch (z. B. "stahl-selbstwert"), neueste zuerst
   bookNoteOpen: <id>|null, bookNoteFilter: "alle"|"todo-offen"|"aha"|"zitat"|"bezug",
+  bookGuide: { <bookId>: { <qid>: "Text"|Zahl|"Auswahl" } }, // Guide-Bücher (mode 'guide', z. B. "zweites-kind");
+                                        // qid 'timing-plan' = "YYYY-MM" (Abstands-Rechner), Skalen = 1–10, Chips = Options-Text
+  bookGuideOpen: <sectionId>|null,      // aufgeklappte Etappe im Guide
   frei: {                               // Tab „Freiheit & Kontrolle“
     log:   { "YYYY-MM-DD": "clean" | "fall" },
     urges: [{ id, date, time, outcome: "res"|"gave", intensity: 1–10,
@@ -70,7 +73,8 @@ end_score_changed, reflexion_edited, habit_added, habit_checked, habit_removed,
 habit_comment_saved, frei_day_marked, frei_dank_edited, frei_diary_edited,
 frei_field_edited, urge_logged, urge_removed, year_switched, tab_selected,
 history_entry_removed, history_cleared, import, challenge_toggled, challenge_note_edited,
-book_opened, book_task_added, book_task_edited, book_task_toggled, book_task_removed`.
+book_opened, book_task_added, book_task_edited, book_task_toggled, book_task_removed,
+book_note_added, book_note_edited, book_note_toggled, book_note_removed, book_guide_answered`.
 
 ## Code-Wegweiser (app.js, ~1470 Zeilen — gezielt springen statt alles lesen)
 | Bereich | Funktionen |
@@ -85,6 +89,7 @@ book_opened, book_task_added, book_task_edited, book_task_toggled, book_task_rem
 | Bücher (Tab, Regal + Buch-Aufgaben) | `renderBuecher`, `renderBookShelf`, `renderBookTasks`, `setBookTask`, `openBook`; Buch-Registry `BOOKS` + Aufgaben-Typen `TASK_TYPES` am Dateianfang — neue Bücher dort ergänzen |
 | Hörbuch-Notizen (Bücher im mode `notes`, z. B. Stahl »Leben kann auch einfach sein!«) | `renderBookNotes`, `setBookNote`; Notiz-Typen `NOTE_TYPES` + Kapitel-Liste am Buch (`chapters`) am Dateianfang |
 | Mini-Challenges (Wehrle-Buch im Bücher-Tab) | `renderChallenges`, `setChallenge`, `isoWeek`; statische Daten in `frontend/js/challenges-data.js` (52 Einträge aus Wehrle-Buch, `Sources/`) |
+| Reflexions-Guide (Bücher im mode `guide`, z. B. »Ein zweites Kind?«) | `renderBookGuide`, `setGuideAnswer`, `guideAnswered`, `guideTimingTool` (Abstands-Rechner, Tochter geb. 03.09.2024); statische Etappen/Fragen in `frontend/js/zweiteskind-data.js` (`KIND2_SECTIONS`) |
 | Verlauf-Drawer | `renderOverlay`, `openLog` |
 | Boot/Init | `init`, `renderBoot` |
 

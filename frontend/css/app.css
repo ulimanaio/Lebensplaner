@@ -862,6 +862,30 @@ main { max-width: 1180px; margin: 0 auto; padding: clamp(16px, 4vw, 32px) clamp(
 .bt-delete:hover { color: var(--danger); }
 .heute-book-label { color: #C58AF9; }
 
+/* Geführter Reflexions-Guide (Bücher im mode 'guide') */
+.gd-science-p { font-size: 13px; color: var(--sec); line-height: 1.6; margin: 0 0 10px; }
+.gd-science-p:last-child { margin-bottom: 0; }
+.gd-scale-row { display: flex; align-items: center; gap: 12px; }
+.gd-scale-row input[type=range] { flex: 1; cursor: pointer; min-height: 20px; }
+.gd-scale-val {
+  flex: none; min-width: 34px; text-align: center; font-family: var(--font-display);
+  font-size: 15px; color: var(--accent); background: var(--inset); border-radius: 100px; padding: 4px 0;
+}
+.gd-scale-val.unset { color: var(--dim); }
+.gd-scale-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); margin-top: 4px; }
+.gd-timing { background: var(--inset); border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+.gd-timing-slider { margin: 12px 0; font-size: 14px; color: var(--sec); }
+.gd-timing-slider b { color: var(--title); }
+.gd-timing-slider input[type=range] { width: 100%; margin-top: 8px; cursor: pointer; min-height: 20px; }
+.gd-timing-stats { display: flex; flex-direction: column; gap: 8px; }
+.gd-timing-row { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; color: var(--title); }
+.gd-timing-k { color: var(--mut); flex: none; }
+.gd-timing-note { font-size: 12px; color: var(--mut); line-height: 1.5; margin-top: 8px; }
+.gd-badge { font-size: 13px; line-height: 1.5; border-radius: 12px; padding: 8px 12px; }
+.gd-badge.ok { background: rgba(129, 201, 149, 0.12); color: #81C995; }
+.gd-badge.mid { background: rgba(253, 214, 99, 0.12); color: #FDD663; }
+.gd-badge.warn { background: rgba(242, 139, 130, 0.12); color: #F28B82; }
+
 /* ===== Mobile Bottom-Nav ===== */
 /* Auf Desktop komplett versteckt; nur ≤720 px als fixe Leiste eingeblendet. */
 .bottom-nav { display: none; }

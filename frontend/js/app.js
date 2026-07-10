@@ -2,6 +2,7 @@
 // Nachbau von design_reference/Lebensplaner.dc.html, Daten via /api statt localStorage.
 import { getDoc, saveDoc, flushAll, sendEvent, setSaveListener, setPendingListener, pendingSaves } from './api.js';
 import { CHALLENGES } from './challenges-data.js';
+import { KIND2_SECTIONS, KIND2_GEBURT_TOCHTER } from './zweiteskind-data.js';
 import { mdField, mdToHtml } from './markdown.js';
 
 const AREAS = [
@@ -70,6 +71,15 @@ const BOOKS = [
       'Test & Tipps: Intro- und Extraversion',
       'Epilog',
     ],
+  },
+  {
+    id: 'zweites-kind',
+    title: 'Ein zweites Kind?',
+    author: 'Geführte Reflexion',
+    emoji: '👶',
+    color: '#F28B82',
+    mode: 'guide',
+    intro: 'Kein Buch, sondern eine Reise in 8 Etappen: kluge Fragen entlang echter Studienlage — inklusive Abstands-Rechner. Nimm dir pro Etappe einen ruhigen Moment; die Antworten bleiben gespeichert.',
   },
 ];
 
@@ -267,6 +277,8 @@ function freshGlobalDoc() {
     bookTasks: {},           // <bookId>: [{ id, type, title, page, prompt, answer, items, done, doneAt, createdAt }]
     bookTaskOpen: null,      // aufgeklappte Aufgaben-Karte
     bookTaskFilter: 'alle',  // 'alle' | 'offen' | 'erledigt'
+    bookGuide: {},           // <bookId>: { <qid>: Text|Zahl|Auswahl } — Antworten der Guide-Bücher
+    bookGuideOpen: null,     // aufgeklappte Etappe im Guide-Modus (Section-ID oder null)
   };
 }
 
@@ -1703,6 +1715,12 @@ function bookProgress(book, g) {
     const done = CHALLENGES.filter((c) => all[c.id] && all[c.id].done).length;
     return { done, total: CHALLENGES.length, label: done + ' / ' + CHALLENGES.length + ' Challenges erledigt' };
   }
+  if (book.mode === 'guide') {
+    const answers = (g.bookGuide || {})[book.id] || {};
+    const qs = KIND2_SECTIONS.flatMap((s) => s.questions);
+    const done = qs.filter((q) => guideAnswered(q, answers)).length;
+    return { done, total: qs.length, label: done + ' / ' + qs.length + ' Fragen beantwortet' };
+  }
   if (book.mode === 'notes') {
     const notes = (g.bookNotes || {})[book.id] || [];
     const openTodos = notes.filter((n) => n.type === 'todo' && !n.done).length;
@@ -1725,6 +1743,7 @@ function renderBuecher() {
   const open = BOOKS.find((b) => b.id === g.bookOpen);
   if (open && open.mode === 'challenges') return renderChallenges();
   if (open && open.mode === 'notes') return renderBookNotes(open);
+  if (open && open.mode === 'guide') return renderBookGuide(open);
   if (open) return renderBookTasks(open);
   return renderBookShelf();
 }
@@ -2096,6 +2115,184 @@ function renderBookNotes(book) {
         : el('div', { class: 'ch-list', style: 'margin-top:0;' },
             filtered.length === 0 ? el('div', { class: 'frei-intro' }, 'Keine Notizen in diesem Filter.') : filtered.map(noteCard)),
     ),
+  );
+}
+
+// ---------- Geführter Reflexions-Guide (Bücher im mode 'guide', z. B. „Ein zweites Kind?") ----------
+// Etappen als aufklappbare Karten: Forschungs-Kontext (einklappbar) + Fragen.
+// Frage-Typen: text (mdField) / scale (Slider 1–10) / choice (Chips).
+// Antworten in global.bookGuide[bookId][qid]; offene Etappe = global.bookGuideOpen.
+
+function guideAnswered(q, answers) {
+  const v = answers[q.id];
+  if (q.type === 'text') return !!(v && String(v).trim());
+  return v != null;
+}
+
+function setGuideAnswer(bookId, qid, value) {
+  const g = state.global;
+  const cur = (g.bookGuide || {})[bookId] || {};
+  setGlobal({ bookGuide: { ...(g.bookGuide || {}), [bookId]: { ...cur, [qid]: value } } }, 'Reflexionsfrage beantwortet');
+  sendEvent('book_guide_answered', { bookId, qid });
+}
+
+const MONATE_DE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+
+// Monats-Index (Jahr*12+Monat) für Abstands-Rechnungen; iso = "YYYY-MM" oder "YYYY-MM-DD".
+function ymIndex(iso) {
+  const [y, m] = iso.split('-').map(Number);
+  return y * 12 + (m - 1);
+}
+function ymLabel(idx) {
+  return MONATE_DE[idx % 12] + ' ' + Math.floor(idx / 12);
+}
+function ymIso(idx) {
+  return Math.floor(idx / 12) + '-' + String((idx % 12) + 1).padStart(2, '0');
+}
+
+// Abstands-Rechner für den Zweites-Kind-Guide: Slider wählt den angepeilten
+// Zeugungsmonat, daraus WHO-Abstand (Geburt→Empfängnis), Geburtstermin und
+// Altersabstand der Tochter. Gespeichert als "YYYY-MM" unter qid 'timing-plan'.
+function guideTimingTool(book) {
+  const answers = (state.global.bookGuide || {})[book.id] || {};
+  const birthIdx = ymIndex(KIND2_GEBURT_TOCHTER);
+  const nowIdx = ymIndex(new Date().toISOString().slice(0, 7));
+  const maxOffset = 36;
+  const savedIdx = answers['timing-plan'] ? ymIndex(answers['timing-plan']) : nowIdx;
+  const startOffset = Math.min(maxOffset, Math.max(0, savedIdx - nowIdx));
+
+  const alterHeute = nowIdx - birthIdx;
+  const whoIdx = birthIdx + 24; // WHO: ≥ 24 Monate Geburt → nächste Empfängnis
+
+  const zeugEl = el('b', {}, '');
+  const statsEl = el('div', { class: 'gd-timing-stats' });
+
+  function gapText(gap) {
+    if (gap < 24) return '„Zwei unter zwei": maximal intensive Jahre, dafür die Kleinkind-Phase in einem Rutsch. Forschung: kleine Abstände → mehr Spielnähe UND mehr Konflikt.';
+    if (gap < 36) return 'Klassischer 2–3-Jahres-Abstand: Eure Tochter versteht schon viel und der Spielabstand bleibt klein — Trotzphase und Baby können sich aber überlagern.';
+    if (gap < 48) return '3–4 Jahre: Tochter ist im Kindergarten und deutlich autonomer — der Alltag entzerrt sich, Rivalität sinkt statistisch.';
+    return '4+ Jahre: sehr entzerrt, fast zwei „Einzelkind-Phasen" — weniger gemeinsames Spielalter, dafür oft eine fürsorgliche große Schwester.';
+  }
+
+  function update(offset) {
+    const ci = nowIdx + offset;
+    const ipi = ci - birthIdx;      // Geburt → Empfängnis
+    const geburtIdx = ci + 9;       // grob: Zeugung + 9 Monate
+    const gap = geburtIdx - birthIdx;
+    zeugEl.textContent = ymLabel(ci);
+    const who = ipi >= 24
+      ? { cls: 'ok', txt: '✓ WHO-Empfehlung erfüllt (' + ipi + ' Monate seit Geburt, empfohlen ≥ 24)' }
+      : ipi >= 18
+        ? { cls: 'mid', txt: '~ ' + ipi + ' Monate seit Geburt — knapp unter der WHO-Empfehlung (24), laut neuerer Studienlage in gut versorgten Ländern unkritisch' }
+        : { cls: 'warn', txt: '! ' + ipi + ' Monate seit Geburt — unter 18 Monaten zeigen Meta-Analysen leicht erhöhte Risiken' };
+    statsEl.replaceChildren(
+      el('div', { class: 'gd-badge ' + who.cls }, who.txt),
+      el('div', { class: 'gd-timing-row' }, el('span', { class: 'gd-timing-k' }, 'Geburt Kind 2'), el('span', {}, '≈ ' + ymLabel(geburtIdx))),
+      el('div', { class: 'gd-timing-row' }, el('span', { class: 'gd-timing-k' }, 'Altersabstand'), el('span', {}, Math.floor(gap / 12) + ' J. ' + (gap % 12) + ' M. — Tochter wäre dann ' + Math.floor(gap / 12) + ' Jahre und ' + (gap % 12) + ' Monate')),
+      el('div', { class: 'gd-timing-note' }, gapText(gap)),
+    );
+  }
+
+  const slider = rangeSlider({
+    value: startOffset, min: 0, max: maxOffset,
+    onInput: (ev) => update(Number(ev.target.value)),
+    onChange: (ev) => setGuideAnswer(book.id, 'timing-plan', ymIso(nowIdx + Number(ev.target.value))),
+  });
+  update(startOffset);
+
+  return el('div', { class: 'gd-timing' },
+    el('div', { class: 'bt-label' }, 'Abstands-Rechner'),
+    el('div', { class: 'gd-timing-note' },
+      'Heute: Eure Tochter (geb. 03.09.2024) ist ' + Math.floor(alterHeute / 12) + ' Jahre und ' + (alterHeute % 12) + ' Monate alt. ' +
+      'Das WHO-Fenster (≥ 24 Monate bis zur nächsten Empfängnis) ist ab ' + ymLabel(whoIdx) + ' erfüllt.'),
+    el('div', { class: 'gd-timing-slider' },
+      el('div', {}, 'Angepeilte Zeugung: ', zeugEl),
+      slider,
+    ),
+    statsEl,
+    el('div', { class: 'gd-timing-note' }, 'Realistisch rechnen: Bis zur Empfängnis dauert es im Schnitt 3–6 Zyklen — der Regler zeigt den Wunsch-, nicht den Garantie-Monat.'),
+  );
+}
+
+function renderBookGuide(book) {
+  const g = state.global;
+  const answers = (g.bookGuide || {})[book.id] || {};
+  const p = bookProgress(book, g);
+
+  function scaleField(q) {
+    const val = answers[q.id];
+    const badge = el('span', { class: 'gd-scale-val' + (val == null ? ' unset' : '') }, val == null ? '–' : String(val));
+    return el('div', { class: 'frei-why-q' },
+      el('div', { class: 'frei-why-q-label' }, q.q),
+      el('div', { class: 'gd-scale-row' },
+        rangeSlider({
+          value: val == null ? 5 : val,
+          onInput: (ev) => { badge.textContent = ev.target.value; badge.classList.remove('unset'); },
+          onChange: (ev) => setGuideAnswer(book.id, q.id, Number(ev.target.value)),
+        }),
+        badge,
+      ),
+      el('div', { class: 'gd-scale-ends' }, el('span', {}, '1 = ' + q.left), el('span', {}, '10 = ' + q.right)),
+    );
+  }
+
+  function choiceField(q) {
+    return el('div', { class: 'frei-why-q' },
+      el('div', { class: 'frei-why-q-label' }, q.q),
+      el('div', { class: 'bt-type-chips' },
+        q.options.map((opt) => el('button', {
+          class: 'bt-chip' + (answers[q.id] === opt ? ' active' : ''),
+          onClick: () => { setGuideAnswer(book.id, q.id, opt); render(); },
+        }, opt)),
+      ),
+    );
+  }
+
+  function textField(q) {
+    return el('div', { class: 'frei-why-q' },
+      el('div', { class: 'frei-why-q-label' }, q.q),
+      mdField({
+        rows: 3, value: answers[q.id] || '', placeholder: q.ph || '', title: q.q,
+        onCommit: (v) => setGuideAnswer(book.id, q.id, v),
+      }),
+    );
+  }
+
+  function sectionCard(s, i) {
+    const open = g.bookGuideOpen === s.id;
+    const done = s.questions.filter((q) => guideAnswered(q, answers)).length;
+    const allDone = done === s.questions.length;
+
+    const head = el('button', {
+      class: 'ch-head', onClick: () => { setGlobal({ bookGuideOpen: open ? null : s.id }); render(); },
+    },
+      el('span', { class: 'ch-nr' + (allDone ? ' done' : '') }, allDone ? '✓' : s.emoji),
+      el('span', { class: 'ch-head-text' },
+        el('span', { class: 'ch-title' }, 'Etappe ' + (i + 1) + ': ' + s.title),
+        el('span', { class: 'ch-sub' }, s.sub + ' · ' + done + '/' + s.questions.length),
+      ),
+      el('span', { class: 'ch-chevron' + (open ? ' open' : '') }, '›'),
+    );
+
+    const body = open && el('div', { class: 'ch-body' },
+      collapsibleInfo('🔬 Was die Forschung sagt',
+        el('div', {}, s.science.map((t) => el('p', { class: 'gd-science-p' }, t)))),
+      s.timing && guideTimingTool(book),
+      s.questions.map((q) => q.type === 'scale' ? scaleField(q) : q.type === 'choice' ? choiceField(q) : textField(q)),
+    );
+
+    return el('div', { class: 'card ch-card' }, head, body);
+  }
+
+  return el('div', { class: 'screen', 'data-screen-label': book.title },
+    bookBackRow(),
+    el('h2', { class: 'section-h2', style: 'margin-top:0;' }, book.emoji + ' ' + book.title),
+    el('div', { class: 'frei-intro' }, book.intro),
+    el('div', { class: 'ch-progress' },
+      el('div', { class: 'ch-progress-bar' }, el('div', { class: 'ch-progress-fill', style: 'width:' + (p.total ? Math.round((p.done / p.total) * 100) : 0) + '%;' })),
+      el('span', { class: 'ch-progress-label' }, p.label),
+    ),
+    el('div', { class: 'ch-list', style: 'margin-top:16px;' }, KIND2_SECTIONS.map(sectionCard)),
   );
 }
 
