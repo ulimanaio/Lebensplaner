@@ -441,7 +441,17 @@ main { max-width: 1180px; margin: 0 auto; padding: clamp(16px, 4vw, 32px) clamp(
 /* Ausgewählter Tag */
 .frei-day-card { display: flex; flex-direction: column; }
 .frei-day-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
-.frei-day-label { font-family: var(--font-display); font-size: 15px; font-weight: 500; color: var(--title); flex: 1; }
+.frei-day-label-wrap { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.frei-day-label { font-family: var(--font-display); font-size: 15px; font-weight: 500; color: var(--title); flex: 1; min-width: 0; }
+.frei-day-nav {
+  flex: 0 0 auto; width: 32px; height: 32px; border-radius: 100px;
+  background: transparent; border: 1px solid var(--border); color: var(--title);
+  font-size: 18px; line-height: 1; cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+}
+.frei-day-nav:hover { background: var(--inset); }
+.frei-day-nav.disabled { opacity: 0.35; cursor: default; }
+.frei-day-nav.disabled:hover { background: transparent; }
 .frei-today-btn {
   background: transparent; border: 1px solid var(--border); color: var(--accent);
   border-radius: 100px; padding: 7px 14px; font-family: var(--font-display);

@@ -1000,10 +1000,9 @@ function renderFreiTagebuch() {
   const log = F.log || {};
   const urges = F.urges || [];
   const today = isoOf(new Date());
-  // Nach einem Tageswechsel (00:00) immer automatisch auf den aktuellen Tag springen,
-  // damit keine Einträge versehentlich beim gestrigen Datum landen. Zurückblättern in der
-  // Vergangenheit bleibt möglich; über Mitternacht hinweg wird die Auswahl wieder auf heute gesetzt.
-  if (g.freiSelDate && g.freiSelDate < today) g.freiSelDate = today;
+  // Über Mitternacht hinweg wird die Auswahl auf den neuen Tag gezogen — das erledigt
+  // scheduleMidnightRefresh(). Hier NICHT beim Rendern zurücksetzen, sonst lässt sich im
+  // Verlauf kein vergangener Tag anwählen (Klick würde sofort wieder auf heute springen).
   const selDate = g.freiSelDate || today;
   const dayMs = 86400000;
 
@@ -1115,8 +1114,30 @@ function renderFreiTagebuch() {
 
   const dayCard = el('div', { class: 'card p24 frei-day-card', id: 'frei-day-card' },
     el('div', { class: 'frei-day-head' },
-      el('div', { class: 'frei-day-label' },
-        selD.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + (selDate === today ? ' · Heute' : '')),
+      el('div', { class: 'frei-day-label-wrap' },
+        el('button', {
+          class: 'frei-day-nav', title: 'Vorheriger Tag',
+          onClick: () => {
+            g.freiSelDate = isoOf(new Date(selD.getTime() - dayMs));
+            const d = goodDate(g.freiSelDate);
+            g.freiCalYear = d.getFullYear(); g.freiCalMonth = d.getMonth();
+            render();
+          },
+        }, '‹'),
+        el('div', { class: 'frei-day-label' },
+          selD.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + (selDate === today ? ' · Heute' : '')),
+        el('button', {
+          class: 'frei-day-nav' + (selDate >= today ? ' disabled' : ''),
+          title: 'Nächster Tag', disabled: selDate >= today,
+          onClick: () => {
+            if (selDate >= today) return;
+            g.freiSelDate = isoOf(new Date(selD.getTime() + dayMs));
+            const d = goodDate(g.freiSelDate);
+            g.freiCalYear = d.getFullYear(); g.freiCalMonth = d.getMonth();
+            render();
+          },
+        }, '›'),
+      ),
       selDate !== today && el('button', {
         class: 'frei-today-btn',
         onClick: () => { g.freiSelDate = today; g.freiCalYear = now.getFullYear(); g.freiCalMonth = now.getMonth(); render(); },
