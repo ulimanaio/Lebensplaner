@@ -16,6 +16,9 @@ const AREAS = [
 
 const MAX_FOKUS = 2;
 
+// App-Version. Bei jedem Release erhöhen. Wird per Long-Press aufs Logo angezeigt.
+const APP_VERSION = '1.0.0';
+
 const TABS = [
   { id: 'heute', label: 'Heute' },
   { id: 'dashboard', label: 'Dashboard' },
@@ -346,6 +349,25 @@ function showToast(text) {
   document.body.append(toast);
   setTimeout(() => toast.remove(), 2500);
 }
+// Long-Press aufs Logo → zeigt die aktuelle App-Version als Toast.
+function logoPressHandlers() {
+  let timer = null;
+  const start = (ev) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
+      showToast('Lebensplaner v' + APP_VERSION);
+    }, 600);
+  };
+  const cancel = () => clearTimeout(timer);
+  return {
+    onPointerDown: start,
+    onPointerUp: cancel,
+    onPointerLeave: cancel,
+    onPointerCancel: cancel,
+    onContextMenu: (ev) => ev.preventDefault(),
+  };
+}
 function pressHandlers(habitId, idx, toggle) {
   const clearPress = (ev) => {
     clearTimeout(lpTimer);
@@ -520,7 +542,7 @@ function renderHeader() {
   refs.saveBtn = el('button', { class: 'save-chip save-chip--idle', title: 'Änderungsverlauf anzeigen', onClick: onSaveChipClick });
   const header = el('header', { class: 'header' },
     el('div', { class: 'header-left' },
-      el('div', { class: 'logo' }, 'L'),
+      el('div', { class: 'logo', title: 'Lange drücken für Version', ...logoPressHandlers() }, 'L'),
       el('div', {},
         el('div', { class: 'header-title-row' },
           el('div', { class: 'app-title' }, 'Lebensplaner'),
