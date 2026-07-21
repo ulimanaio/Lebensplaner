@@ -896,6 +896,34 @@ main { max-width: 1180px; margin: 0 auto; padding: clamp(16px, 4vw, 32px) clamp(
 .gd-badge.mid { background: rgba(253, 214, 99, 0.12); color: #FDD663; }
 .gd-badge.warn { background: rgba(242, 139, 130, 0.12); color: #F28B82; }
 
+/* Kleinkind-Kompass (Buch im mode 'library') */
+.kk-section { background: var(--card); border-radius: 24px; overflow: hidden; }
+.kk-section-head {
+  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+  background: none; border: none; cursor: pointer; padding: 16px 20px; min-height: 44px;
+}
+.kk-section-head:hover { background: var(--hover); }
+.kk-kern { display: flex; flex-direction: column; gap: 8px; margin: 0 0 16px; padding-left: 20px; }
+.kk-kern li { font-size: 14px; color: var(--body); line-height: 1.6; }
+.kk-tool {
+  background: var(--inset); border-radius: 16px; padding: 14px 16px; margin-bottom: 12px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.kk-tool:last-of-type { margin-bottom: 16px; }
+.kk-tool-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.kk-tool-name { font-family: var(--font-display); font-size: 14px; font-weight: 500; color: var(--title); }
+.kk-wie { display: flex; flex-direction: column; gap: 6px; margin: 0; padding-left: 18px; }
+.kk-wie li { font-size: 13px; color: var(--sec); line-height: 1.5; }
+.kk-tool-warum { font-size: 12px; color: var(--mut); font-style: italic; line-height: 1.5; }
+.kk-tried {
+  flex: none; background: none; border: 1px solid var(--border); color: var(--sec);
+  border-radius: 100px; padding: 10px 16px; font-size: 13px; cursor: pointer;
+  min-height: 44px; font-family: var(--font-display);
+}
+.kk-tried:hover { background: var(--hover); }
+.kk-tried.active { border-color: var(--accent); color: #131314; background: var(--accent); }
+@media (max-width: 600px) { .ch-body .kk-tool { padding: 12px 14px; } }
+
 /* ===== Mobile Bottom-Nav ===== */
 /* Auf Desktop komplett versteckt; nur ≤720 px als fixe Leiste eingeblendet. */
 .bottom-nav { display: none; }

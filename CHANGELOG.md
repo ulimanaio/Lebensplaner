@@ -3,6 +3,8 @@ Alle nennenswerten Änderungen. Format: Keep a Changelog / SemVer-frei (Datums-R
 
 ## [Unreleased]
 ### Added
+- `frontend/js/kleinkind-data.js`: Kleinkind-Kompass-Datendatei mit 9 Sektionen aus 8 Elternbüchern (akut, Lansbury, Faber, Siegel, Montessori, Elternkompass, Juul, Napthali, Karp); 19 Werkzeuge mit eindeutigen IDs.
+- Kleinkind-Kompass als neues Buch im Bücher-Tab (`mode 'library'`): Regal-Karte mit Fortschritt, auf-/zuklappbare Sektionen mit Kernideen, Werkzeugen samt „Ausprobiert“-Toggle und Notizfeld je Sektion (`renderBookLibrary` in `frontend/js/app.js`).
 ### Changed
 ### Fixed
 

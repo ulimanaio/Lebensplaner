@@ -3,6 +3,7 @@
 import { getDoc, saveDoc, flushAll, sendEvent, setSaveListener, setPendingListener, pendingSaves } from './api.js';
 import { CHALLENGES } from './challenges-data.js';
 import { KIND2_SECTIONS, KIND2_GEBURT_TOCHTER } from './zweiteskind-data.js';
+import { KLEINKIND_SECTIONS } from './kleinkind-data.js';
 import { mdField, mdToHtml } from './markdown.js';
 
 const AREAS = [
@@ -83,6 +84,15 @@ const BOOKS = [
     color: '#F28B82',
     mode: 'guide',
     intro: 'Kein Buch, sondern eine Reise in 8 Etappen: kluge Fragen entlang echter Studienlage — inklusive Abstands-Rechner. Nimm dir pro Etappe einen ruhigen Moment; die Antworten bleiben gespeichert.',
+  },
+  {
+    id: 'kleinkind',
+    title: 'Kleinkind-Kompass',
+    author: 'Destillat aus 8 Elternbüchern',
+    emoji: '🧸',
+    color: '#81C995',
+    mode: 'library',
+    intro: 'Kuratierte Kernideen & Werkzeuge aus deinem Kleinkind-Regal (≈ 2 Jahre): Kratzen, Zähneputzen, müde Abende — plus die wichtigsten Ideen jedes Buchs. Hake an, was du ausprobiert hast, und notiere, was bei eurer Tochter wirkt.',
   },
 ];
 
@@ -282,6 +292,7 @@ function freshGlobalDoc() {
     bookTaskFilter: 'alle',  // 'alle' | 'offen' | 'erledigt'
     bookGuide: {},           // <bookId>: { <qid>: Text|Zahl|Auswahl } — Antworten der Guide-Bücher
     bookGuideOpen: null,     // aufgeklappte Etappe im Guide-Modus (Section-ID oder null)
+    kleinkind: { open: 'akut', tried: {}, notes: {} }, // Kleinkind-Kompass (Buch im mode 'library')
   };
 }
 
@@ -1773,6 +1784,13 @@ function bookProgress(book, g) {
         : notes.length + ' Notiz' + (notes.length === 1 ? '' : 'en') + (openTodos > 0 ? ' · ' + openTodos + ' offen umzusetzen' : ''),
     };
   }
+  if (book.mode === 'library') {
+    if (typeof KLEINKIND_SECTIONS === 'undefined') return { done: 0, total: 0, label: 'Daten nicht geladen' };
+    const tried = (g.kleinkind || {}).tried || {};
+    const total = KLEINKIND_SECTIONS.reduce((n, s) => n + (s.tools ? s.tools.length : 0), 0);
+    const done = Object.values(tried).filter(Boolean).length;
+    return { done, total, label: done + ' / ' + total + ' ausprobiert' };
+  }
   const tasks = (g.bookTasks || {})[book.id] || [];
   const done = tasks.filter((t) => t.done).length;
   return {
@@ -1787,6 +1805,7 @@ function renderBuecher() {
   if (open && open.mode === 'challenges') return renderChallenges();
   if (open && open.mode === 'notes') return renderBookNotes(open);
   if (open && open.mode === 'guide') return renderBookGuide(open);
+  if (open && open.mode === 'library') return renderBookLibrary(open);
   if (open) return renderBookTasks(open);
   return renderBookShelf();
 }
@@ -2336,6 +2355,91 @@ function renderBookGuide(book) {
       el('span', { class: 'ch-progress-label' }, p.label),
     ),
     el('div', { class: 'ch-list', style: 'margin-top:16px;' }, KIND2_SECTIONS.map(sectionCard)),
+  );
+}
+
+// ---------- Kleinkind-Kompass (mode 'library') ----------
+function renderBookLibrary(book) {
+  const g = state.global;
+  if (!g.kleinkind) g.kleinkind = { open: 'akut', tried: {}, notes: {} };
+
+  if (typeof KLEINKIND_SECTIONS === 'undefined') {
+    return el('div', { class: 'screen', 'data-screen-label': book.title },
+      bookBackRow(),
+      el('h2', { class: 'section-h2', style: 'margin-top:0;' }, book.emoji + ' ' + book.title),
+      el('div', { class: 'frei-intro' }, 'Daten nicht geladen — bitte Seite neu laden.'),
+    );
+  }
+
+  const kk = g.kleinkind;
+  const tried = kk.tried || {};
+  const notes = kk.notes || {};
+  const openId = KLEINKIND_SECTIONS.some((s) => s.id === kk.open) ? kk.open : null;
+
+  function toolCard(section, tool) {
+    const isTried = !!tried[tool.id];
+    return el('div', { class: 'kk-tool' },
+      el('div', { class: 'kk-tool-head' },
+        el('span', { class: 'kk-tool-name' }, tool.name),
+        el('button', {
+          class: 'kk-tried' + (isTried ? ' active' : ''),
+          onClick: () => {
+            const nextTried = { ...g.kleinkind.tried };
+            const now = !nextTried[tool.id];
+            if (now) nextTried[tool.id] = new Date().toISOString().slice(0, 10); else delete nextTried[tool.id];
+            setGlobal({ kleinkind: { ...g.kleinkind, tried: nextTried } }, now ? 'Werkzeug ausprobiert' : 'Werkzeug zurückgesetzt');
+            sendEvent('kleinkind_tool_tried', { toolId: tool.id, tried: now });
+            render();
+          },
+        }, isTried ? '✓ Ausprobiert' : 'Ausprobiert'),
+      ),
+      el('ul', { class: 'kk-wie' }, tool.wie.map((step) => el('li', {}, step))),
+      el('div', { class: 'kk-tool-warum' }, tool.warum),
+    );
+  }
+
+  function sectionCard(section) {
+    const open = openId === section.id;
+    const toolCount = section.tools ? section.tools.length : 0;
+    const doneCount = section.tools ? section.tools.filter((t) => tried[t.id]).length : 0;
+
+    const head = el('button', {
+      class: 'kk-section-head', onClick: () => {
+        setGlobal({ kleinkind: { ...g.kleinkind, open: open ? null : section.id } }, 'Kompass-Sektion geöffnet');
+        render();
+      },
+    },
+      el('span', { class: 'ch-nr' }, section.emoji),
+      el('span', { class: 'ch-head-text' },
+        el('span', { class: 'ch-title' }, section.title),
+        el('span', { class: 'ch-sub' }, section.src + (toolCount > 0 ? ' · ' + doneCount + '/' + toolCount + ' ausprobiert' : '')),
+      ),
+      el('span', { class: 'ch-chevron' + (open ? ' open' : '') }, '›'),
+    );
+
+    const body = open && el('div', { class: 'ch-body' },
+      el('ul', { class: 'kk-kern' }, section.kern.map((t) => el('li', {}, t))),
+      (section.tools || []).map((tool) => toolCard(section, tool)),
+      el('div', { class: 'frei-why-q' },
+        el('div', { class: 'frei-why-q-label' }, 'Meine Notizen'),
+        mdField({
+          rows: 3, value: notes[section.id] || '', placeholder: 'Was wirkt bei eurer Tochter? …', title: 'Notiz: ' + section.title,
+          onCommit: (v) => {
+            setGlobal({ kleinkind: { ...g.kleinkind, notes: { ...(g.kleinkind.notes || {}), [section.id]: v } } }, 'Kompass-Notiz');
+            sendEvent('kleinkind_note_edited', { sectionId: section.id });
+          },
+        }),
+      ),
+    );
+
+    return el('div', { class: 'card kk-section' }, head, body);
+  }
+
+  return el('div', { class: 'screen', 'data-screen-label': book.title },
+    bookBackRow(),
+    el('h2', { class: 'section-h2', style: 'margin-top:0;' }, book.emoji + ' ' + book.title),
+    el('div', { class: 'frei-intro' }, book.intro),
+    el('div', { class: 'ch-list', style: 'margin-top:16px;' }, KLEINKIND_SECTIONS.map(sectionCard)),
   );
 }
 
